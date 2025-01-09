@@ -67,7 +67,8 @@ void	Server::run(void)
 	}
 
 	// _timeout is measured in ms
-	_timeout = 3*60*1000;
+	_timeout = -1;
+//	_timeout = 3*60*1000;
 	_socksN = _listenSocks.size();
 	_lstnN = _socksN;
 	_newConnect = -2;
@@ -157,7 +158,8 @@ void	Server::run(void)
 						// construcor os the responder class. For now, just an int code
 						// lol
 						// TODO responder class
-						ResponseGenerator responseObject(200);
+//						ResponseGenerator responseObject(200);
+						ResponseGenerator responseObject(404);
 
 						send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 						//                                               XXX?????XXX
