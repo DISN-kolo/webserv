@@ -2,10 +2,9 @@
 # define SERVER_HPP
 
 # include "ServerConfig.hpp"
+# include "ResponseGenerator.hpp"
 # include "webserv.hpp"
-# include "exceptions.hpp"
 
-# include <sstream>
 # include <ctime>
 # include <unistd.h>
 # include <poll.h>
@@ -35,12 +34,11 @@ private:
 	int					_curSize;
 	bool				_running;
 	int					_newConnect;
-	std::string			_response;
 	bool				_compressTheArr;
 	int					_retCode;
 public:
 	Server();
-	void	run(void) const;
+	void	run(void);
 	~Server();
 } ;
 

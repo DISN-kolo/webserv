@@ -2,11 +2,15 @@
 # define MICROSERV_HPP
 
 # include <iostream>
+# include <map>
+# include <vector>
 
+/*
 class Server ;
 class ServerConfig ;
 # include "Server.hpp"
 # include "ServerConfig.hpp"
+*/
 
 # ifndef CRLF
 #  define CRLF "\r\n"

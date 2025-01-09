@@ -1,7 +1,7 @@
 #include "../inc/ServerConfig.hpp"
 
 ServerConfig::ServerConfig()
-	:	_hostname("local")
+	:	_hostname("localhost")
 {
 	_ports.push_back(9000);
 }

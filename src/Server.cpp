@@ -16,10 +16,11 @@ Server &Server::operator=(const Server & obj)
 	return (*this);
 }
 
-void	Server::run(void) const
+void	Server::run(void)
 {
-	sockaddr_in	addresses[_config->getPorts().size()];
-	for (unsigned long i = 0; i < _config->getPorts().size(); i++)
+	std::vector<int>	lPorts = _config->getPorts();
+	sockaddr_in	addresses[lPorts.size()];
+	for (unsigned long i = 0; i < lPorts.size(); i++)
 	{
 		// open some abstract socket
 		// and also make it nonblocking
@@ -28,8 +29,8 @@ void	Server::run(void) const
 			throw socketUnopenedError();
 
 		// make it reusable
-		reuseAddressValue = 1;
-		if (setsockopt(_listenSock, SOL_SOCKET, SO_REUSEADDR, &reuseAddressValue, sizeof(reuseAddressValue)) < 0)
+		_reuseAddressValue = 1;
+		if (setsockopt(_listenSock, SOL_SOCKET, SO_REUSEADDR, &_reuseAddressValue, sizeof(_reuseAddressValue)) < 0)
 			throw sockOptError();
 
 		// make a struct that has the type of the address, the ip, the port
@@ -37,7 +38,8 @@ void	Server::run(void) const
 		addresses[i].sin_family = AF_INET;
 		addresses[i].sin_addr.s_addr = htonl(INADDR_ANY);
 		// TODO maybe thru the config not "any" ----^^^
-		addresses[i].sin_port = htons(_config->getPorts()[i]);
+		// TODO need to make a function to convert a.b.c.d into whatever s_addr is
+		addresses[i].sin_port = htons(lPorts[i]);
 		// make a sock be of a specified address
 		if (bind(_listenSock, (struct sockaddr *)&(addresses[i]), sizeof(addresses[i])) < 0)
 			throw bindError();
@@ -72,9 +74,9 @@ void	Server::run(void) const
 	// newconnect's -2 is its init value while -1 indicates a fail
 	_compressTheArr = false;
 	char	buf[RBUF_SIZE];
-	std::cout << "Alright, starting. Ports: " << *(_config->getPorts().begin()) << ".." << *(_config->getPorts().end() - 1) << std::endl;
-	running = true;
-	while (running)
+	std::cout << "Alright, starting. Ports: " << *(lPorts.begin()) << ".." << *(lPorts.end() - 1) << std::endl;
+	_running = true;
+	while (_running)
 	{
 		_retCode = poll(socks, _socksN, _timeout);
 //		_retCode = poll(socks, _socksN, 0);
@@ -90,8 +92,8 @@ void	Server::run(void) const
 
 		// go thru all the socks that could have possibly been affected
 		// see if they've been affected
-		curSize = _socksN;
-		for (int i = 0; i < curSize; i++)
+		_curSize = _socksN;
+		for (int i = 0; i < _curSize; i++)
 		{
 			if (socks[i].revents == 0)
 			{
@@ -151,17 +153,21 @@ void	Server::run(void) const
 					{
 						std::cout << "received:" << std::endl;
 						std::cout << buf << std::endl;
+						// TODO parse request. results of parsing shall go to the
+						// construcor os the responder class. For now, just an int code
+						// lol
 						// TODO responder class
-						_response = _responseGenerator(200);
+						ResponseGenerator responseObject(200);
 
-						send(socks[i].fd, _response.c_str(), _response.size(), 0);
+						send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 						//                                               XXX?????XXX
 //						send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
 						//                                               XXX?????XXX
 
 						std::cout << "sent:" << std::endl;
-						std::cout << _response << std::endl;
+						std::cout << responseObject.getText() << std::endl;
 					}
+					// keep-alive check, pls TODO
 					close(socks[i].fd);
 					socks[i].fd = -1;
 					_compressTheArr = true;
@@ -193,7 +199,7 @@ void	Server::run(void) const
 			}
 		}
 //		std::cout << "one cycle done!" << std::endl;
-	} /* while (running) */
+	} /* while (_running) */
 }
 
 Server::~Server()

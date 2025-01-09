@@ -11,6 +11,7 @@ private:
 
 	std::string	reqType;
 	std::string	askedPath;
+	bool		ka;
 public:
 	RequestParser(const std::string request);
 	~RequestParser();
