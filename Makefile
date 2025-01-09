@@ -1,6 +1,7 @@
 NAME = webserv
 
-SRCNAMES = main.cpp
+SRCNAMES = main.cpp \
+		   exceptions.cpp
 
 SRCS = $(addprefix src/, $(SRCNAMES))
 OBJS = $(addprefix obj/, $(SRCNAMES:.cpp=.o))

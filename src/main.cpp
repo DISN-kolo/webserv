@@ -1,66 +1,10 @@
 #include "../inc/webserv.hpp"
 
-// at some point, to understand how would select(2) work, i started closely following this:
-// https://www.lowtek.com/sockets/select.html
-//
-// this entire thing should probably be rewritten with poll(2), tho.
-// but i NEED to know how it works, in general, before that. :)
-
-const char *socketUnopenedError::what(void) const throw()
-{
-	return ("Socket error: unable to open");
-}
-
-const char *sockOptError::what(void) const throw()
-{
-	return ("SockOpt error: unable to set");
-}
-
-const char *bindError::what(void) const throw()
-{
-	return ("Bind error");
-}
-
-const char *listenError::what(void) const throw()
-{
-	return ("Can't hear anything");
-}
-
-const char *acceptError::what(void) const throw()
-{
-	return ("This is unacceptable!");
-}
-
-const char *badPortError::what(void) const throw()
-{
-	return ("Bad port (use 1024-65535)");
-}
-
-const char *tooManyPorts::what(void) const throw()
-{
-	return ("Can't have THAT many ports open");
-}
-
-const char *readError::what(void) const throw()
-{
-	return ("Read error");
-}
-
-const char *fcntlError::what(void) const throw()
-{
-	return ("fcntl error (get/set opt, for example)");
-}
-
-const char *selectError::what(void) const throw()
-{
-	return ("Select error");
-}
-
-const char *pollError::what(void) const throw()
-{
-	return ("Poll error");
-}
-
+// dummy function.
+// real function is probably like:
+// 200? get something that was required.
+// anything else? get a standard eror page OR a page specified by the config.
+// => needs access to config
 std::string	getContent(int code)
 {
 	if (code == 200)
