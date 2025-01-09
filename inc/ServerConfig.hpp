@@ -1,6 +1,9 @@
 #ifndef SERVER_CONFIG_HPP
 # define SERVER_CONFIG_HPP
 
+# include "webserv.hpp"
+# include <vector>
+
 class ServerConfig
 {
 private:
