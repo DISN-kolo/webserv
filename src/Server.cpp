@@ -66,9 +66,8 @@ void	Server::run(void)
 		socks[i].events = POLLIN;
 	}
 
-	// _timeout is measured in ms
+	// _timeout is measured in ms, but here we go infinitely
 	_timeout = -1;
-//	_timeout = 3*60*1000;
 	_socksN = _listenSocks.size();
 	_lstnN = _socksN;
 	_newConnect = -2;
@@ -80,15 +79,13 @@ void	Server::run(void)
 	while (_running)
 	{
 		_retCode = poll(socks, _socksN, _timeout);
-//		_retCode = poll(socks, _socksN, 0);
-		// idk. we shall live forever? nonblockingly? TODO
 		if (_retCode < 0)
 			throw pollError();
-		else if (_retCode == 0)
-		{
-			std::cout << "Poll timeout. Byeeeee" << std::endl;
-			return ;
-		}
+//		else if (_retCode == 0)
+//		{
+//			std::cout << "Poll timeout. Byeeeee" << std::endl;
+//			return ;
+//		}
 		std::cout << "Just poll'd, socks number is " << _socksN << std::endl;
 
 		// go thru all the socks that could have possibly been affected

@@ -9,11 +9,13 @@ private:
 	RequestParser(const RequestParser & obj);
 	RequestParser &operator=(const RequestParser & obj);
 
-	std::string	reqType;
-	std::string	askedPath;
-	bool		ka;
+	std::string	_request;
+	std::string	_reqType;
+	std::string	_askedPath;
+	// keep-alive
+	bool		_ka;
 public:
-	RequestParser(const std::string request);
+	RequestParser(const char *r);
 	~RequestParser();
 } ;
 #endif
