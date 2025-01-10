@@ -81,6 +81,8 @@ void	Server::run(void)
 	_running = true;
 	bool	keepalive; // XXX TODO see below
 	keepalive = false;
+	for (int k = 0; k < _socksN; k++)
+		_lastSocks[socks[k].fd] = socks[k];
 	while (_running)
 	{
 		_retCode = poll(socks, _socksN, _timeout);
@@ -100,6 +102,41 @@ void	Server::run(void)
 		{
 			if (socks[i].revents == 0)
 			{
+				// TODO if the recv loop situation is permitted, than this would be useless. please i hope so????? recv loop my beloved.
+				if (i >= _lstnN && (_lastSocks[socks[i].fd].revents & POLLIN) == POLLIN && socks[i].fd != -1)
+				{
+					std::cout << std::setw(4) << i << " > " << std::flush;
+					std::cout << "Conn " << socks[i].fd << " has 0 to read" << std::endl;
+					if (_localRecvBuffers[i].size() != 0)
+					{
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "Landed on 0 read, but not from scratch. Therefore," << std::endl;
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "total message:" << std::endl;
+						std::cout << _localRecvBuffers[i] << std::endl;
+						ResponseGenerator responseObject(200);
+//						ResponseGenerator responseObject(404);
+
+						send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+						//                                               XXX?????XXX
+//						send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
+						//                                               XXX?????XXX
+
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "sent:" << std::endl;
+						std::cout << responseObject.getText() << std::endl;
+						_localRecvBuffers[i].clear();
+					}
+					// THIS NEEDS TO BE RECEIVED FROM THE REQUEST!! maybe have a default value from the config (don't KA)
+					// needs to be an array of KA or don't KA
+					// XXX TODO
+					if (!keepalive)
+					{
+						close(socks[i].fd);
+						socks[i].fd = -1;
+						_compressTheArr = true;
+					}
+				}
 //				std::cout << "revents on " << i << " is 0" << std::endl;
 				continue ;
 			}
@@ -107,9 +144,12 @@ void	Server::run(void)
 			{
 				if (i < _lstnN)
 				{
-//					std::cout << "_listenSock got a pollerr or a pollhup" << std::endl;
+					std::cout << std::setw(4) << i << " > " << std::flush;
+					std::cout << "_listenSock got a pollerr or a pollhup or an nval" << std::endl;
 					continue ;
 				}
+				std::cout << std::setw(4) << i << " > " << std::flush;
+				std::cout << "got an err/hup/val" << std::endl;
 				close(socks[i].fd);
 				socks[i].fd = -1;
 				//socks[i].events = 0;
@@ -149,12 +189,35 @@ void	Server::run(void)
 						close(socks[i].fd);
 						socks[i].fd = -1;
 						_compressTheArr = true;
-//						std::cout << "_retCode " << _retCode << "but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
+						std::cout << "_retCode " << _retCode << "but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 //						throw readError();
 					}
 					else if (_retCode == 0)
 					{
-//						std::cout << "Conn " << socks[i].fd << " at " << i << " has 0 to read" << std::endl;
+						// idk if we ever enter here EVER.
+						// XXX TODO delete me????????????????
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "Conn " << socks[i].fd << " has 0 to read" << std::endl;
+						if (_localRecvBuffers[i].size() != 0)
+						{
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "Landed on 0 read, but not from scratch. Therefore," << std::endl;
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "total message:" << std::endl;
+							std::cout << _localRecvBuffers[i] << std::endl;
+							ResponseGenerator responseObject(200);
+//							ResponseGenerator responseObject(404);
+
+							send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+							//                                               XXX?????XXX
+//							send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
+							//                                               XXX?????XXX
+
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "sent:" << std::endl;
+							std::cout << responseObject.getText() << std::endl;
+							_localRecvBuffers[i].clear();
+						}
 						// THIS NEEDS TO BE RECEIVED FROM THE REQUEST!! maybe have a default value from the config (don't KA)
 						// needs to be an array of KA or don't KA
 						// XXX TODO
@@ -167,6 +230,8 @@ void	Server::run(void)
 					}
 					else if (_retCode < RBUF_SIZE)
 					{
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "Terminating read cuz read less than RBUF (" << _retCode << "<" << RBUF_SIZE << ")" << std::endl;
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "received:" << std::endl;
 						std::cout << buf << std::endl;
@@ -200,7 +265,7 @@ void	Server::run(void)
 					else
 					{
 						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, while the RBUF (w/o 0) is " << RBUF_SIZE << "." << std::endl;
+						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes == RBUF's (w/o \\0) " << RBUF_SIZE << "." << std::endl;
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "Continue reading thru the next cycle!!!" << std::endl;
 						std::cout << std::setw(4) << i << " > " << std::flush;
@@ -226,6 +291,7 @@ void	Server::run(void)
 					_socksN--;
 					for (int j = i; j < _socksN; j++)
 					{
+						_localRecvBuffers[j] = _localRecvBuffers[j + 1];
 						socks[j].fd = socks[j + 1].fd;
 						socks[j].events = socks[j + 1].events;
 						socks[j].revents = socks[j + 1].revents;
@@ -235,12 +301,16 @@ void	Server::run(void)
 			}
 			for (int k = _socksN; k < BLOG_SIZE; k++)
 			{
+				_localRecvBuffers[k].clear();
 				socks[k].fd = -1;
 				socks[k].events = 0;
 				socks[k].revents = 0;
 			}
 		}
-//		std::cout << "one cycle done!" << std::endl;
+		_lastSocks.clear();
+		for (int k = 0; k < _socksN; k++)
+			_lastSocks[socks[k].fd] = socks[k];
+		std::cout << "                one cycle done!" << std::endl;
 	} /* while (_running) */
 }
 

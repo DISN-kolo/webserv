@@ -18,7 +18,7 @@ class ServerConfig ;
 # endif
 
 # ifndef RBUF_SIZE
-#  define RBUF_SIZE 64
+#  define RBUF_SIZE 2
 # endif
 
 # ifndef BLOG_SIZE

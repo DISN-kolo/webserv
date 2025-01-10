@@ -25,18 +25,19 @@ private:
 	ServerConfig		*_config;
 
 	// internal variables used for the run function
-	int							_listenSock;
-	std::vector<int>			_listenSocks;
-	std::vector<std::string>	_localRecvBuffers;
-	int							_reuseAddressValue;
-	int 						_timeout;
-	int							_socksN;
-	int							_lstnN;
-	int							_curSize;
-	bool						_running;
-	int							_newConnect;
-	bool						_compressTheArr;
-	int							_retCode;
+	int								_listenSock;
+	std::map<int, struct pollfd>	_lastSocks;
+	std::vector<int>				_listenSocks;
+	std::vector<std::string>		_localRecvBuffers;
+	int								_reuseAddressValue;
+	int 							_timeout;
+	int								_socksN;
+	int								_lstnN;
+	int								_curSize;
+	bool							_running;
+	int								_newConnect;
+	bool							_compressTheArr;
+	int								_retCode;
 public:
 	Server();
 	void	run(void);
