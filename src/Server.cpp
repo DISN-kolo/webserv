@@ -70,12 +70,17 @@ void	Server::run(void)
 	_timeout = -1;
 	_socksN = _listenSocks.size();
 	_lstnN = _socksN;
-	_newConnect = -2;
 	// newconnect's -2 is its init value while -1 indicates a fail
+	_newConnect = -2;
 	_compressTheArr = false;
 	char	buf[RBUF_SIZE];
+	// this will store what we read because we shall be able to read in multiple passes before closing the connection.
+	_localRecvBuffers = std::vector<std::string>(BLOG_SIZE, "");
+
 	std::cout << "Alright, starting. Ports: " << *(lPorts.begin()) << ".." << *(lPorts.end() - 1) << std::endl;
 	_running = true;
+	bool	keepalive; // XXX TODO see below
+	keepalive = false;
 	while (_running)
 	{
 		_retCode = poll(socks, _socksN, _timeout);
@@ -140,23 +145,39 @@ void	Server::run(void)
 					_retCode = recv(socks[i].fd, buf, sizeof(buf), 0);
 					if (_retCode < 0)
 					{
+						// to crash or not to crash? XXX to think
+						close(socks[i].fd);
+						socks[i].fd = -1;
+						_compressTheArr = true;
 //						std::cout << "_retCode " << _retCode << "but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 //						throw readError();
 					}
 					else if (_retCode == 0)
 					{
 //						std::cout << "Conn " << socks[i].fd << " at " << i << " has 0 to read" << std::endl;
+						// THIS NEEDS TO BE RECEIVED FROM THE REQUEST!! maybe have a default value from the config (don't KA)
+						// needs to be an array of KA or don't KA
+						// XXX TODO
+						if (!keepalive)
+						{
+							close(socks[i].fd);
+							socks[i].fd = -1;
+							_compressTheArr = true;
+						}
 					}
-					else
+					else if (_retCode < RBUF_SIZE)
 					{
 						std::cout << "received:" << std::endl;
 						std::cout << buf << std::endl;
+						_localRecvBuffers[i] += std::string(buf);
+						std::cout << "total message:" << std::endl;
+						std::cout << _localRecvBuffers[i] << std::endl;
 						// TODO parse request. results of parsing shall go to the
-						// construcor os the responder class. For now, just an int code
+						// construcor of the responder class. For now, just an int code
 						// lol
 						// TODO responder class
-//						ResponseGenerator responseObject(200);
-						ResponseGenerator responseObject(404);
+						ResponseGenerator responseObject(200);
+//						ResponseGenerator responseObject(404);
 
 						send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 						//                                               XXX?????XXX
@@ -165,11 +186,25 @@ void	Server::run(void)
 
 						std::cout << "sent:" << std::endl;
 						std::cout << responseObject.getText() << std::endl;
+						_localRecvBuffers[i].clear();
+						if (!keepalive)
+						{
+							close(socks[i].fd);
+							socks[i].fd = -1;
+							_compressTheArr = true;
+						}
+					}
+					else
+					{
+						std::cout << "Message on " << i << " received (maybe) partially. Continue reading thru the next cycle!!!" << std::endl;
+						std::cout << "received:" << std::endl;
+						std::cout << buf << std::endl;
+						_localRecvBuffers[i] += std::string(buf);
 					}
 					// keep-alive check, pls TODO
-					close(socks[i].fd);
-					socks[i].fd = -1;
-					_compressTheArr = true;
+//					close(socks[i].fd);
+//					socks[i].fd = -1;
+//					_compressTheArr = true;
 				}
 			}
 		} /* for to iterate thru socks upon poll's return */
