@@ -73,7 +73,7 @@ void	Server::run(void)
 	// newconnect's -2 is its init value while -1 indicates a fail
 	_newConnect = -2;
 	_compressTheArr = false;
-	char	buf[RBUF_SIZE];
+	char	buf[RBUF_SIZE + 1];
 	// this will store what we read because we shall be able to read in multiple passes before closing the connection.
 	_localRecvBuffers = std::vector<std::string>(BLOG_SIZE, "");
 
@@ -140,9 +140,9 @@ void	Server::run(void)
 				else if (socks[i].fd != -1)
 				{
 //					std::cout << "Descriptior " << socks[i].fd << " at pos " << i << " readable" << std::endl;
-					for (int j = 0; j < RBUF_SIZE; j++)
+					for (int j = 0; j < RBUF_SIZE + 1; j++)
 						buf[j] = 0;
-					_retCode = recv(socks[i].fd, buf, sizeof(buf), 0);
+					_retCode = recv(socks[i].fd, buf, RBUF_SIZE, 0);
 					if (_retCode < 0)
 					{
 						// to crash or not to crash? XXX to think
@@ -167,9 +167,11 @@ void	Server::run(void)
 					}
 					else if (_retCode < RBUF_SIZE)
 					{
+						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "received:" << std::endl;
 						std::cout << buf << std::endl;
 						_localRecvBuffers[i] += std::string(buf);
+						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "total message:" << std::endl;
 						std::cout << _localRecvBuffers[i] << std::endl;
 						// TODO parse request. results of parsing shall go to the
@@ -184,6 +186,7 @@ void	Server::run(void)
 //						send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
 						//                                               XXX?????XXX
 
+						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "sent:" << std::endl;
 						std::cout << responseObject.getText() << std::endl;
 						_localRecvBuffers[i].clear();
@@ -196,8 +199,13 @@ void	Server::run(void)
 					}
 					else
 					{
-						std::cout << "Message on " << i << " received (maybe) partially. Continue reading thru the next cycle!!!" << std::endl;
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, while the RBUF (w/o 0) is " << RBUF_SIZE << "." << std::endl;
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "Continue reading thru the next cycle!!!" << std::endl;
+						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "received:" << std::endl;
+						buf[_retCode] = 0;
 						std::cout << buf << std::endl;
 						_localRecvBuffers[i] += std::string(buf);
 					}

@@ -11,7 +11,8 @@ OBJS = $(addprefix obj/, $(SRCNAMES:.cpp=.o))
 DEPS = $(addprefix obj/, $(SRCNAMES:.cpp=.d))
 
 CC = c++
-CFLAGS = -Wall -Wextra -Werror -std=c++98# -fsanitize=address# -g -fsanitize=address
+#CFLAGS = -Wall -Wextra -Werror -std=c++98
+CFLAGS = -Wall -Wextra -Werror -std=c++98 -g -fsanitize=address
 RM = rm -rf
 
 .PHONY: all clean fclean re
