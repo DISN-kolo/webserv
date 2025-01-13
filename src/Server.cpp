@@ -175,18 +175,29 @@ void	Server::run(void)
 								// construcor of the responder class. For now, just an int code
 								// lol
 								// TODO responder class
-								RequestParser		req(_localRecvBuffers[i]);
-								ResponseGenerator	responseObject(200);
-//								ResponseGenerator	responseObject(404);
+								try
+								{
+									RequestParser		req(_localRecvBuffers[i]);
+									ResponseGenerator	responseObject(200);
 
-								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-								//                                               XXX?????XXX
-//								send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
-								//                                               XXX?????XXX
+									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "sent:" << std::endl;
-								std::cout << responseObject.getText() << std::flush;
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << "sent:" << std::endl;
+									std::cout << responseObject.getText() << std::flush;
+								}
+								catch (std::exception & e)
+								{
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << e.what() << std::endl;
+									ResponseGenerator	responseObject(e.what());
+
+									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << "sent:" << std::endl;
+									std::cout << responseObject.getText() << std::flush;
+								}
 								_localRecvBuffers[i].clear();
 								if (!keepalive)
 								{
@@ -237,22 +248,29 @@ void	Server::run(void)
 							std::cout << std::setw(4) << i << " > " << std::flush;
 							std::cout << "Total msg:" << std::endl;
 							std::cout << _localRecvBuffers[i] << std::flush;
-							// TODO parse request. results of parsing shall go to the
-							// construcor of the responder class. For now, just an int code
-							// lol
-							// TODO responder class
-							RequestParser		req(_localRecvBuffers[i]);
-							ResponseGenerator	responseObject(200);
-//							ResponseGenerator	responseObject(404);
+							try
+							{
+								RequestParser		req(_localRecvBuffers[i]);
+								ResponseGenerator	responseObject(200);
 
-							send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-							//                                               XXX?????XXX
-//							send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
-							//                                               XXX?????XXX
+								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "sent:" << std::endl;
-							std::cout << responseObject.getText() << std::flush;
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "sent:" << std::endl;
+								std::cout << responseObject.getText() << std::flush;
+							}
+							catch (std::exception & e)
+							{
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << e.what() << std::endl;
+								ResponseGenerator	responseObject(e.what());
+
+								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "sent:" << std::endl;
+								std::cout << responseObject.getText() << std::flush;
+							}
 							_localRecvBuffers[i].clear();
 							if (!keepalive)
 							{

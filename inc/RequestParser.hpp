@@ -12,6 +12,8 @@ private:
 	RequestParser(const RequestParser & obj);
 	RequestParser &operator=(const RequestParser & obj);
 
+	std::vector<std::string>	_acceptableMethods;
+
 	// like, the totality
 	std::string	_r;
 

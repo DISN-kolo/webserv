@@ -55,3 +55,8 @@ const char *pollError::what(void) const throw()
 	return ("Poll error");
 }
 
+const char *badRequest::what(void) const throw()
+{
+	return ("400 Bad Request");
+}
+

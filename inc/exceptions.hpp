@@ -69,4 +69,10 @@ class	pollError: public std::exception
 		virtual const char	*what(void) const throw();
 };
 
+class	badRequest: public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 #endif

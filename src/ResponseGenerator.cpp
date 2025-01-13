@@ -19,6 +19,21 @@ ResponseGenerator::ResponseGenerator(int code)
 	_text = ss.str();
 }
 
+ResponseGenerator::ResponseGenerator(const char * ewhat)
+{
+	std::stringstream	ss;
+	std::string	cont = _getErrorPage(std::string(ewhat));
+	ss << "HTTP/1.1 " << ewhat << CRLF;
+	ss << "Date: " << _getDate() << CRLF;
+	ss << "Server: " << _getServerName() << CRLF;
+	ss << "Content-Type: " << _getContentType() << CRLF;
+	ss << "Content-Length: " << cont.size() << CRLF;
+	ss << CRLF;
+	ss << cont;
+	ss << CRLF;
+	_text = ss.str();
+}
+
 ResponseGenerator::ResponseGenerator(const ResponseGenerator & obj)
 {
 	(void)obj;
@@ -34,7 +49,7 @@ ResponseGenerator::~ResponseGenerator()
 {
 }
 
-// dummy function.
+// dummy function. TODO
 // real function is probably like:
 // 200? get something that was required.
 // anything else? get a standard eror page OR a page specified by the config.
@@ -47,6 +62,15 @@ std::string	ResponseGenerator::_getContent(int code)
 		return ("<head align=\"center\">404 Not Found</head>");
 	else
 		return ("A secret third option");
+}
+
+// I beg you, make a map.
+// or not,, that's why it aint a todo lol
+std::string	ResponseGenerator::_getErrorPage(std::string ewhat)
+{
+	std::string	ret;
+	ret = "<head align=\"center\">" + ewhat + "</head>";
+	return (ret);
 }
 
 // TODO proably a good idea to make a map of statuses
