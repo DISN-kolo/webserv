@@ -102,41 +102,8 @@ void	Server::run(void)
 		{
 			if (socks[i].revents == 0)
 			{
-				if (i >= _lstnN && (_lastSocks[socks[i].fd].revents & POLLIN) == POLLIN && socks[i].fd != -1)
-				{
-					std::cout << std::setw(4) << i << " > " << std::flush;
-					std::cout << "Conn " << socks[i].fd << " has 0 to read" << std::endl;
-					if (_localRecvBuffers[i].size() != 0)
-					{
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Landed on 0 read, but not from scratch. Therefore," << std::endl;
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "total message:" << std::endl;
-						std::cout << _localRecvBuffers[i] << std::endl;
-						ResponseGenerator responseObject(200);
-//						ResponseGenerator responseObject(404);
-
-						send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-						//                                               XXX?????XXX
-//						send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
-						//                                               XXX?????XXX
-
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "sent:" << std::endl;
-						std::cout << responseObject.getText() << std::endl;
-						_localRecvBuffers[i].clear();
-					}
-					// THIS NEEDS TO BE RECEIVED FROM THE REQUEST!! maybe have a default value from the config (don't KA)
-					// needs to be an array of KA or don't KA
-					// XXX TODO
-					if (!keepalive)
-					{
-						close(socks[i].fd);
-						socks[i].fd = -1;
-						_compressTheArr = true;
-					}
-				}
 //				std::cout << "revents on " << i << " is 0" << std::endl;
+				continue ;
 			}
 			else if (((socks[i].revents & POLLERR) == POLLERR) || ((socks[i].revents & POLLHUP) == POLLHUP) || ((socks[i].revents & POLLNVAL) == POLLNVAL))
 			{
@@ -192,15 +159,6 @@ void	Server::run(void)
 					}
 					else if (_retCode < RBUF_SIZE)
 					{
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Terminating read cuz read less than RBUF (" << _retCode << "<" << RBUF_SIZE << ")" << std::endl;
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "received:" << std::endl;
-						std::cout << buf << std::endl;
-						_localRecvBuffers[i] += std::string(buf);
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "total message:" << std::endl;
-						std::cout << _localRecvBuffers[i] << std::endl;
 						// TODO parse request. results of parsing shall go to the
 						// construcor of the responder class. For now, just an int code
 						// lol
@@ -226,15 +184,22 @@ void	Server::run(void)
 					}
 					else
 					{
+						// TODO: bare CR to SP replace
+						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes == RBUF's (w/o \\0) " << RBUF_SIZE << "." << std::endl;
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Continue reading thru the next cycle!!!" << std::endl;
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "received:" << std::endl;
 						buf[_retCode] = 0;
 						std::cout << buf << std::endl;
 						_localRecvBuffers[i] += std::string(buf);
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "Checking for a double line-break (any combo of LF and CRLF)" << std::endl;
+
+						_localRecvBuffers[i].find()
+
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "Continue reading thru the next cycle!!!" << std::endl;
 					}
 					// keep-alive check, pls TODO
 //					close(socks[i].fd);
