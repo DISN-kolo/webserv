@@ -102,7 +102,7 @@ void	Server::run(void)
 		{
 			if (socks[i].revents == 0)
 			{
-//				std::cout << "revents on " << i << " is 0" << std::endl;
+				std::cout << "revents on " << i << " is 0" << std::endl;
 				continue ;
 			}
 			else if (((socks[i].revents & POLLERR) == POLLERR) || ((socks[i].revents & POLLHUP) == POLLHUP) || ((socks[i].revents & POLLNVAL) == POLLNVAL))
@@ -154,52 +154,118 @@ void	Server::run(void)
 						close(socks[i].fd);
 						socks[i].fd = -1;
 						_compressTheArr = true;
-						std::cout << "_retCode " << _retCode << "but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "_retCode " << _retCode << " but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 //						throw readError();
 					}
-					else if (_retCode < RBUF_SIZE)
+					else if (_retCode == 0)
 					{
-						// TODO parse request. results of parsing shall go to the
-						// construcor of the responder class. For now, just an int code
-						// lol
-						// TODO responder class
-						ResponseGenerator responseObject(200);
-//						ResponseGenerator responseObject(404);
-
-						send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-						//                                               XXX?????XXX
-//						send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
-						//                                               XXX?????XXX
-
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "sent:" << std::endl;
-						std::cout << responseObject.getText() << std::endl;
-						_localRecvBuffers[i].clear();
-						if (!keepalive)
+						// how do we even get here.......
+						if (_localRecvBuffers[i].size() != 0)
 						{
+							if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
+									_localRecvBuffers[i].find(LFCRLF) != std::string::npos ||
+									_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
+									_localRecvBuffers[i].find(LFLF) != std::string::npos)
+							{
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Head located. Stop reading ts cro" << std::endl;
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Total msg:" << std::endl;
+								std::cout << _localRecvBuffers[i] << std::flush;
+								// TODO parse request. results of parsing shall go to the
+								// construcor of the responder class. For now, just an int code
+								// lol
+								// TODO responder class
+								ResponseGenerator responseObject(200);
+//								ResponseGenerator responseObject(404);
+
+								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+								//                                               XXX?????XXX
+//								send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
+								//                                               XXX?????XXX
+
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "sent:" << std::endl;
+								std::cout << responseObject.getText() << std::flush;
+								_localRecvBuffers[i].clear();
+								if (!keepalive)
+								{
+									close(socks[i].fd);
+									socks[i].fd = -1;
+									_compressTheArr = true;
+								}
+							}
+							else
+							{
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Is that some sort of a joke?" << std::endl;
+								close(socks[i].fd);
+								socks[i].fd = -1;
+								_compressTheArr = true;
+							}
+						}
+						else
+						{
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "Is that some sort of a joke 2?" << std::endl;
 							close(socks[i].fd);
 							socks[i].fd = -1;
 							_compressTheArr = true;
 						}
 					}
-					else
+					else if (_retCode > 0)
 					{
 						// TODO: bare CR to SP replace
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
 						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes == RBUF's (w/o \\0) " << RBUF_SIZE << "." << std::endl;
+						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << RBUF_SIZE << "." << std::endl;
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "received:" << std::endl;
 						buf[_retCode] = 0;
 						std::cout << buf << std::endl;
 						_localRecvBuffers[i] += std::string(buf);
+
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "Checking for a double line-break (any combo of LF and CRLF)" << std::endl;
+						if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
+								_localRecvBuffers[i].find(LFCRLF) != std::string::npos ||
+								_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
+								_localRecvBuffers[i].find(LFLF) != std::string::npos)
+						{
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "Head located. Stop reading ts cro" << std::endl;
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "Total msg:" << std::endl;
+							std::cout << _localRecvBuffers[i] << std::flush;
+							// TODO parse request. results of parsing shall go to the
+							// construcor of the responder class. For now, just an int code
+							// lol
+							// TODO responder class
+							ResponseGenerator responseObject(200);
+//							ResponseGenerator responseObject(404);
 
-						_localRecvBuffers[i].find()
+							send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+							//                                               XXX?????XXX
+//							send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
+							//                                               XXX?????XXX
 
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Continue reading thru the next cycle!!!" << std::endl;
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "sent:" << std::endl;
+							std::cout << responseObject.getText() << std::flush;
+							_localRecvBuffers[i].clear();
+							if (!keepalive)
+							{
+								close(socks[i].fd);
+								socks[i].fd = -1;
+								_compressTheArr = true;
+							}
+						}
+						else
+						{
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "Continue reading thru the next cycle!!!" << std::endl;
+						}
 					}
 					// keep-alive check, pls TODO
 //					close(socks[i].fd);
