@@ -81,8 +81,6 @@ void	Server::run(void)
 	_running = true;
 	bool	keepalive; // XXX TODO see below
 	keepalive = false;
-	for (int k = 0; k < _socksN; k++)
-		_lastSocks[socks[k].fd] = socks[k];
 	while (_running)
 	{
 		_retCode = poll(socks, _socksN, _timeout);
@@ -177,8 +175,9 @@ void	Server::run(void)
 								// construcor of the responder class. For now, just an int code
 								// lol
 								// TODO responder class
-								ResponseGenerator responseObject(200);
-//								ResponseGenerator responseObject(404);
+								RequestParser		req(_localRecvBuffers[i]);
+								ResponseGenerator	responseObject(200);
+//								ResponseGenerator	responseObject(404);
 
 								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 								//                                               XXX?????XXX
@@ -242,8 +241,9 @@ void	Server::run(void)
 							// construcor of the responder class. For now, just an int code
 							// lol
 							// TODO responder class
-							ResponseGenerator responseObject(200);
-//							ResponseGenerator responseObject(404);
+							RequestParser		req(_localRecvBuffers[i]);
+							ResponseGenerator	responseObject(200);
+//							ResponseGenerator	responseObject(404);
 
 							send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 							//                                               XXX?????XXX
@@ -300,9 +300,6 @@ void	Server::run(void)
 				socks[k].revents = 0;
 			}
 		}
-		_lastSocks.clear();
-		for (int k = 0; k < _socksN; k++)
-			_lastSocks[socks[k].fd] = socks[k];
 		std::cout << "                one cycle done!" << std::endl;
 	} /* while (_running) */
 }

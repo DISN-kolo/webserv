@@ -15,9 +15,18 @@ RequestParser &RequestParser::operator=(const RequestParser & obj)
 	return (*this);
 }
 
-RequestParser::RequestParser(const char *r)
-	:	_request(r), _reqType("text/html"), _askedPath("/index.html"), _ka(true)
+RequestParser::RequestParser(std::string r)
+	:	_r(r)
 {
+	std::string			line;
+	std::string			word;
+	std::istringstream	s(r);
+	std::getline(s, line);
+	std::istringstream	ss(line);
+	while (std::getline(ss, word, ' '))
+	{
+		std::cout << word << std::endl;
+	}
 }
 
 RequestParser::~RequestParser()

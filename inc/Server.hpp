@@ -3,6 +3,7 @@
 
 # include "ServerConfig.hpp"
 # include "ResponseGenerator.hpp"
+# include "RequestParser.hpp"
 # include "webserv.hpp"
 
 # include <ctime>
@@ -26,7 +27,6 @@ private:
 
 	// internal variables used for the run function
 	int								_listenSock;
-	std::map<int, struct pollfd>	_lastSocks;
 	std::vector<int>				_listenSocks;
 	std::vector<std::string>		_localRecvBuffers;
 	int								_reuseAddressValue;
