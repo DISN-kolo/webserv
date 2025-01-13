@@ -102,7 +102,6 @@ void	Server::run(void)
 		{
 			if (socks[i].revents == 0)
 			{
-				// TODO if the recv loop situation is permitted, than this would be useless. please i hope so????? recv loop my beloved.
 				if (i >= _lstnN && (_lastSocks[socks[i].fd].revents & POLLIN) == POLLIN && socks[i].fd != -1)
 				{
 					std::cout << std::setw(4) << i << " > " << std::flush;
@@ -138,7 +137,6 @@ void	Server::run(void)
 					}
 				}
 //				std::cout << "revents on " << i << " is 0" << std::endl;
-				continue ;
 			}
 			else if (((socks[i].revents & POLLERR) == POLLERR) || ((socks[i].revents & POLLHUP) == POLLHUP) || ((socks[i].revents & POLLNVAL) == POLLNVAL))
 			{
@@ -191,42 +189,6 @@ void	Server::run(void)
 						_compressTheArr = true;
 						std::cout << "_retCode " << _retCode << "but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 //						throw readError();
-					}
-					else if (_retCode == 0)
-					{
-						// idk if we ever enter here EVER.
-						// XXX TODO delete me????????????????
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Conn " << socks[i].fd << " has 0 to read" << std::endl;
-						if (_localRecvBuffers[i].size() != 0)
-						{
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "Landed on 0 read, but not from scratch. Therefore," << std::endl;
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "total message:" << std::endl;
-							std::cout << _localRecvBuffers[i] << std::endl;
-							ResponseGenerator responseObject(200);
-//							ResponseGenerator responseObject(404);
-
-							send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-							//                                               XXX?????XXX
-//							send(socks[i].fd, _response.c_str(), _response.size() + 1, 0);
-							//                                               XXX?????XXX
-
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "sent:" << std::endl;
-							std::cout << responseObject.getText() << std::endl;
-							_localRecvBuffers[i].clear();
-						}
-						// THIS NEEDS TO BE RECEIVED FROM THE REQUEST!! maybe have a default value from the config (don't KA)
-						// needs to be an array of KA or don't KA
-						// XXX TODO
-						if (!keepalive)
-						{
-							close(socks[i].fd);
-							socks[i].fd = -1;
-							_compressTheArr = true;
-						}
 					}
 					else if (_retCode < RBUF_SIZE)
 					{
