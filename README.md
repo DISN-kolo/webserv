@@ -11,6 +11,8 @@
 
 * when we have a message divisible by the buffer, if, say, EVERY message is like this, then we'll have 0 poll events after reading everything. this will ensure we'll never get to checking previous poll events. thus, we NEED to parse right here, right now, or, rather, we NEED to SEARCH for a DOUBLE LINE BREAK in whatever format because yeah.
 
+* multiline URIs will break the getline by space thing. need to make a "from the start until the first space is the method, from the end until the first-from-backwards space is the protocol, the rest is URI"
+
 ### TODones
 
 * header's end check in request. if there's a ([CR]LF)x2 in the req, this means a header has ended.
