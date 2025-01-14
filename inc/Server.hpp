@@ -23,6 +23,8 @@ private:
 	Server(const Server & obj);
 	Server &operator=(const Server & obj);
 
+	void	_onHeadLocated(int i, int *fdp);
+
 	ServerConfig		*_config;
 
 	// internal variables used for the run function

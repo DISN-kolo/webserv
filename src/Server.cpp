@@ -16,6 +16,50 @@ Server &Server::operator=(const Server & obj)
 	return (*this);
 }
 
+void	Server::_onHeadLocated(int i, int *fdp)
+{
+	std::cout << std::setw(4) << i << " > " << std::flush;
+	std::cout << "Head located. Stop reading ts cro" << std::endl;
+	std::cout << std::setw(4) << i << " > " << std::flush;
+	std::cout << "Total msg:" << std::endl;
+	std::cout << _localRecvBuffers[i] << std::flush;
+	// TODO parse request. results of parsing shall go to the
+	// construcor of the responder class. For now, just an int code
+	// lol
+	// TODO responder class
+	try
+	{
+		RequestParser		req(_localRecvBuffers[i]);
+		ResponseGenerator	responseObject(200);
+
+		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+		std::cout << std::setw(4) << i << " > " << std::flush;
+		std::cout << "sent:" << std::endl;
+		std::cout << responseObject.getText() << std::flush;
+	}
+	catch (std::exception & e)
+	{
+		std::cout << std::setw(4) << i << " > " << std::flush;
+		std::cout << e.what() << std::endl;
+		ResponseGenerator	responseObject(e.what());
+
+		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+		std::cout << std::setw(4) << i << " > " << std::flush;
+		std::cout << "sent:" << std::endl;
+		std::cout << responseObject.getText() << std::flush;
+	}
+	_localRecvBuffers[i].clear();
+	bool	keepalive = false; // TODO I beg you, parse the request.
+	if (!keepalive)
+	{
+		close(*fdp);
+		*fdp = -1;
+		_compressTheArr = true;
+	}
+}
+
 void	Server::run(void)
 {
 	std::vector<int>	lPorts = _config->getPorts();
@@ -158,6 +202,8 @@ void	Server::run(void)
 					}
 					else if (_retCode == 0)
 					{
+						std::cout << std::setw(4) << i << " > " << std::flush;
+						std::cout << "_retCode is 0, but poll says POLLIN and no errors(?). Maybe we forgot to clean up?" << std::endl;
 						// how do we even get here.......
 						if (_localRecvBuffers[i].size() != 0)
 						{
@@ -166,50 +212,17 @@ void	Server::run(void)
 									_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 									_localRecvBuffers[i].find(LFLF) != std::string::npos)
 							{
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Head located. Stop reading ts cro" << std::endl;
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Total msg:" << std::endl;
-								std::cout << _localRecvBuffers[i] << std::flush;
-								// TODO parse request. results of parsing shall go to the
-								// construcor of the responder class. For now, just an int code
-								// lol
-								// TODO responder class
-								try
-								{
-									RequestParser		req(_localRecvBuffers[i]);
-									ResponseGenerator	responseObject(200);
-
-									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << "sent:" << std::endl;
-									std::cout << responseObject.getText() << std::flush;
-								}
-								catch (std::exception & e)
-								{
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << e.what() << std::endl;
-									ResponseGenerator	responseObject(e.what());
-
-									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << "sent:" << std::endl;
-									std::cout << responseObject.getText() << std::flush;
-								}
-								_localRecvBuffers[i].clear();
-								if (!keepalive)
-								{
-									close(socks[i].fd);
-									socks[i].fd = -1;
-									_compressTheArr = true;
-								}
+								_onHeadLocated(i, &(socks[i].fd));
 							}
 							else
 							{
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "Is that some sort of a joke?" << std::endl;
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "No double-enndline, AND the buff isn't zero... But nothing to read." << std::endl;
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Here should be a timeout thing instead, probably." << std::endl;
+								// TODO -----------------------^^^^^^^ (?)
 								close(socks[i].fd);
 								socks[i].fd = -1;
 								_compressTheArr = true;
@@ -218,7 +231,9 @@ void	Server::run(void)
 						else
 						{
 							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "Is that some sort of a joke 2?" << std::endl;
+							std::cout << "Is that some sort of a joke?" << std::endl;
+							std::cout << std::setw(4) << i << " > " << std::flush;
+							std::cout << "Nothing in local buf, the read is 0, how tf did we even get polled????" << std::endl;
 							close(socks[i].fd);
 							socks[i].fd = -1;
 							_compressTheArr = true;
@@ -243,41 +258,7 @@ void	Server::run(void)
 								_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 								_localRecvBuffers[i].find(LFLF) != std::string::npos)
 						{
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "Head located. Stop reading ts cro" << std::endl;
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "Total msg:" << std::endl;
-							std::cout << _localRecvBuffers[i] << std::flush;
-							try
-							{
-								RequestParser		req(_localRecvBuffers[i]);
-								ResponseGenerator	responseObject(200);
-
-								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "sent:" << std::endl;
-								std::cout << responseObject.getText() << std::flush;
-							}
-							catch (std::exception & e)
-							{
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << e.what() << std::endl;
-								ResponseGenerator	responseObject(e.what());
-
-								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "sent:" << std::endl;
-								std::cout << responseObject.getText() << std::flush;
-							}
-							_localRecvBuffers[i].clear();
-							if (!keepalive)
-							{
-								close(socks[i].fd);
-								socks[i].fd = -1;
-								_compressTheArr = true;
-							}
+							_onHeadLocated(i, &(socks[i].fd));
 						}
 						else
 						{
