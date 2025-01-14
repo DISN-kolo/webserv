@@ -1,16 +1,16 @@
-#include "../inc/RequestParser.hpp"
+#include "../inc/RequestHeadParser.hpp"
 #
 
-RequestParser::RequestParser()
+RequestHeadParser::RequestHeadParser()
 {
 }
 
-RequestParser::RequestParser(const RequestParser & obj)
+RequestHeadParser::RequestHeadParser(const RequestHeadParser & obj)
 {
 	(void)obj;
 }
 
-RequestParser &RequestParser::operator=(const RequestParser & obj)
+RequestHeadParser &RequestHeadParser::operator=(const RequestHeadParser & obj)
 {
 	(void)obj;
 	return (*this);
@@ -18,7 +18,7 @@ RequestParser &RequestParser::operator=(const RequestParser & obj)
 
 // lol idk if that's allowed
 #include <algorithm>
-RequestParser::RequestParser(std::string r)
+RequestHeadParser::RequestHeadParser(std::string r)
 	:	_r(r)
 {
 	// bare minimum as per subject
@@ -39,6 +39,6 @@ RequestParser::RequestParser(std::string r)
 	}
 }
 
-RequestParser::~RequestParser()
+RequestHeadParser::~RequestHeadParser()
 {
 }

@@ -3,16 +3,22 @@
 
 ### TODOs
 
-* keep-aliving needs request-parsing, which will generate a req object, which will have a keep-alive flag, which will influence the "close(..)" line
-* sending big data in chunks to non-block would be goated.
-* timeouts vector for every fd in poll to close after 30s
-* reading big data in chunks ends when CRLFx2
+* timeouts vector for every fd in poll to close after 30s (maybe)
+* reading big data in chunks ends when newline x2 (not true for body? YES true for head)
 * big big BIG data should be stored in tmp or something instead. or cut off the connection. or start parsing at the same time to throw an error immediately instead of reading spam/bullshit.
-
-* when we have a message divisible by the buffer, if, say, EVERY message is like this, then we'll have 0 poll events after reading everything. this will ensure we'll never get to checking previous poll events. thus, we NEED to parse right here, right now, or, rather, we NEED to SEARCH for a DOUBLE LINE BREAK in whatever format because yeah.
 
 * multiline URIs will break the getline by space thing. need to make a "from the start until the first space is the method, from the end until the first-from-backwards space is the protocol, the rest is URI"
 
-### TODones
+#### req-parsing an allat
 
-* header's end check in request. if there's a ([CR]LF)x2 in the req, this means a header has ended.
+* requests must have a head (ends on a newline x2)
+* if they do, the head gets scanned by a request head parser
+* the parsed info gets passed into the Connect class
+* if the Connect class needs a body, the funny stage begins
+* the Connect class should have an aux buffer for body
+* you start writing there from the local recv buffer, but first you pass (up to connection length) bytes from the current local recv buffer into there, AFTER the double newline
+* it's like getnextline, but also limited by conten-length
+* if for some reason it's a chunked transfer, make sure to do the same exact procedure, but parse each packet after head in a chunked transfer manner (another separate parser?) and add the sum into the Connect's local body storage
+* having collected all that, we parse the body. (that's IF WE HAD ONE)
+* we go to the response generator with the... either only parsed head, or both parsed head and parsed body (overriding the response generator constructor).
+* at any point in time a bad request should throw badRequest (surprise), that gets to the try-catch block and gets handled appropriately

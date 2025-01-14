@@ -1,16 +1,16 @@
-#ifndef REQUEST_PARSER_HPP
-# define REQUEST_PARSER_HPP
+#ifndef REQUEST_HEAD_PARSER_HPP
+# define REQUEST_HEAD_PARSER_HPP
 # include "webserv.hpp"
 # include <sstream>
 # include <iostream>
 # include <string>
 
-class RequestParser
+class RequestHeadParser
 {
 private:
-	RequestParser();
-	RequestParser(const RequestParser & obj);
-	RequestParser &operator=(const RequestParser & obj);
+	RequestHeadParser();
+	RequestHeadParser(const RequestHeadParser & obj);
+	RequestHeadParser &operator=(const RequestHeadParser & obj);
 
 	std::vector<std::string>	_acceptableMethods;
 
@@ -25,7 +25,7 @@ private:
 	// a dictionary of the head. if some head line isn't matching, just do a "bad request" :)
 	std::map<std::string, std::string>	_head;
 public:
-	RequestParser(std::string r);
-	~RequestParser();
+	RequestHeadParser(std::string r);
+	~RequestHeadParser();
 } ;
 #endif

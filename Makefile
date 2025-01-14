@@ -5,7 +5,8 @@ SRCNAMES = main.cpp \
 		   Server.cpp \
 		   ServerConfig.cpp \
 		   ResponseGenerator.cpp \
-		   RequestParser.cpp
+		   RequestHeadParser.cpp \
+		   RequestBodyParser.cpp
 
 SRCS = $(addprefix src/, $(SRCNAMES))
 OBJS = $(addprefix obj/, $(SRCNAMES:.cpp=.o))

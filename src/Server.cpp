@@ -29,7 +29,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	// TODO responder class
 	try
 	{
-		RequestParser		req(_localRecvBuffers[i]);
+		RequestHeadParser		req(_localRecvBuffers[i]);
 		ResponseGenerator	responseObject(200);
 
 		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
