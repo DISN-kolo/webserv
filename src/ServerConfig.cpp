@@ -1,25 +1,22 @@
 #include "../inc/ServerConfig.hpp"
 
 ServerConfig::ServerConfig()
-	:	_hostname("localhost")
+{}
+
+ServerConfig::ServerConfig(const std::string &file)
 {
-	_ports.push_back(9000);
+	(void) file;
 }
 
 ServerConfig::ServerConfig(const ServerConfig & obj)
 {
-	(void)obj;
+	*this = obj;
 }
 
 ServerConfig &ServerConfig::operator=(const ServerConfig & obj)
 {
-	(void)obj;
+	_config = obj._config;
 	return (*this);
-}
-
-const std::vector<int>	ServerConfig::getPorts(void) const
-{
-	return (_ports);
 }
 
 ServerConfig::~ServerConfig()
