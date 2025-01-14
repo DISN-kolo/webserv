@@ -17,7 +17,7 @@ private:
 	// like, the totality
 	std::string	_r;
 
-	// the first lone ever
+	// the first line ever
 	std::string	_method;
 	std::string	_rTarget;
 	std::string	_protocol;

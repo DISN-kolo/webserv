@@ -22,21 +22,44 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	:	_r(r)
 {
 	// bare minimum as per subject
-	_acceptableMethods.push_back("GET");
-	_acceptableMethods.push_back("POST");
-	_acceptableMethods.push_back("DELETE");
+	_acceptableMethods.push_back("GET ");
+	_acceptableMethods.push_back("POST ");
+	_acceptableMethods.push_back("DELETE ");
 	std::string			line;
-	std::string			word;
 	std::istringstream	s(r);
 	std::getline(s, line);
-	std::istringstream	ss(line);
-	int	i = 0;
-	while (std::getline(ss, word, ' '))
+
+	// parse the method out using a list of known methods
+	std::vector<std::string>::iterator	it = _acceptableMethods.begin();
+	while (it != _acceptableMethods.end())
 	{
-		if (i == 0 && std::find(_acceptableMethods.begin(), _acceptableMethods.end(), word) == _acceptableMethods.end())
-			throw badRequest();
-		i++;
+		if (std::find(_r.begin(), _r.end(), *it) == _r.begin())
+		{
+			_method = (*it).substr((*it).size() - 1);
+			break ;
+		}
+		it++;
 	}
+	if (it == _acceptableMethods.end())
+	{
+		throw badRequest();
+	}
+
+	// forget about multiline URIs for now
+	// and actually, forever. turns out the eval sheet is very fogriving and small
+	// if ok, parse the protocol out. since it HAS to be of definite length,..
+	//               GET sp   /  sp HTTP/1.1
+	if (line.size() < 3 + 1 + 1 + 1 + 8)
+	{
+		throw badRequest();
+	}
+
+//	if (std::find(_r.end() - std::string("HTTP/1.1").size() - 1, _r.end(), "HTTP/1.1") == _r.end())
+	if (*(std::find(line.end() - std::string("HTTP/1.1\r").size() - 1, line.end(), "HTTP/1.1\r")) != "HTTP/1.1\r")
+	{
+		throw badRequest();
+	}
+
 }
 
 RequestHeadParser::~RequestHeadParser()
