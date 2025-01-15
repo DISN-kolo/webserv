@@ -33,8 +33,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	std::vector<std::string>::iterator	it = _acceptableMethods.begin();
 	while (it != _acceptableMethods.end())
 	{
-		// must set *it to char * ffs XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX 
-		if (_r.find(std*it, 0, 16) == 0)
+		if (_r.find(*it) == 0)
 		{
 			_method = (*it).substr((*it).size() - 1);
 			break ;
@@ -60,7 +59,27 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	{
 		throw badRequest();
 	}
+	else
+	{
+		_protocol = "HTTP/1.1";
+	}
 
+	// by that point, the request is probably correct. Still, we need to separate out the requested URI
+	std::string			word;
+	std::istringstream	ss(line);
+	int					wcount = 0;
+	while (std::getline(ss, word, ' '))
+	{
+		if (wcount == 1)
+		{
+			_rTarget = word;
+		}
+		else if (wcount >= 3)
+		{
+			throw badRequest();
+		}
+		wcount++;
+	}
 }
 
 RequestHeadParser::~RequestHeadParser()
