@@ -27,5 +27,10 @@ private:
 public:
 	RequestHeadParser(std::string r);
 	~RequestHeadParser();
+
+	std::map<std::string, std::string>	getHead(void) const;
+	std::string	getMethod(void) const;
+	std::string	getRTarget(void) const;
+	std::string	getProtocol(void) const;
 } ;
 #endif

@@ -145,6 +145,11 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		{
 			//                                           - 1 to rm the \r
 			_head[helper] = line.substr(pos, line.size() - 1);
+			// screw the spacing. it's optional, and it's hurting the abiility to match stuff
+			if (*(_head[helper].begin()) == ' ')
+				_head[helper].erase(0, _head[helper].find_first_not_of(' '));
+			if (*(_head[helper].end() - 1) == ' ')
+				_head[helper].erase(_head[helper].find_last_not_of(' ') + 1);
 		}
 		else
 		{
@@ -156,4 +161,24 @@ RequestHeadParser::RequestHeadParser(std::string r)
 
 RequestHeadParser::~RequestHeadParser()
 {
+}
+
+std::map<std::string, std::string>	RequestHeadParser::getHead(void) const
+{
+	return (_head);
+}
+
+std::string	getMethod(void) const
+{
+	return (_method);
+}
+
+std::string	getRTarget(void) const
+{
+	return (_rTarget);
+}
+
+std::string	getProtocol(void) const
+{
+	return (_protocol);
 }

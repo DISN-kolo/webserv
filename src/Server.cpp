@@ -19,7 +19,7 @@ Server &Server::operator=(const Server & obj)
 void	Server::_onHeadLocated(int i, int *fdp)
 {
 	std::cout << std::setw(4) << i << " > " << std::flush;
-	std::cout << "Head located. Stop reading ts cro" << std::endl;
+	std::cout << "Head located. Stop reading for a moment" << std::endl;
 	std::cout << std::setw(4) << i << " > " << std::flush;
 	std::cout << "Total msg:" << std::endl;
 	std::cout << _localRecvBuffers[i] << std::flush;
@@ -30,6 +30,16 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	try
 	{
 		RequestHeadParser		req(_localRecvBuffers[i]);
+		// a body is a must-have then?
+		if (req.getMethod() == "POST")
+		{
+			// TODO here,, a connection object must know there's a body left to read.
+			// must have a content-length (checked in getmethod?)
+		}
+		else
+		{
+			// TODO here, a regular send
+		}
 		ResponseGenerator	responseObject(200);
 
 		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
@@ -178,6 +188,7 @@ void	Server::run(void)
 								_socksN++;
 								socks[j].fd = _newConnect;
 								socks[j].events = POLLIN;
+								// TODO add a connect array 'new' fill here
 								break ;
 							}
 						}
