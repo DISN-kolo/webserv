@@ -15,10 +15,14 @@
 * if they do, the head gets scanned by a request head parser
 * the parsed info gets passed into the Connect class
 * if the Connect class needs a body, the funny stage begins
-* the Connect class should have an aux buffer for body
-* you start writing there from the local recv buffer, but first you pass (up to connection length) bytes from the current local recv buffer into there, AFTER the double newline
-* it's like getnextline, but also limited by conten-length
-* if for some reason it's a chunked transfer, make sure to do the same exact procedure, but parse each packet after head in a chunked transfer manner (another separate parser?) and add the sum into the Connect's local body storage
-* having collected all that, we parse the body. (that's IF WE HAD ONE)
-* we go to the response generator with the... either only parsed head, or both parsed head and parsed body (overriding the response generator constructor).
+* MAYBE DO THIS: clean the head from the local recv buffer!! erase the sucker.
+* MAYBE DON'T DO THIS INSTEAD: the Connect class should have an aux buffer for body
+* you start writing \<there/local recv buffer\> from the local recv buffer, but first you pass (up to connection length) bytes from the current local recv buffer into there, AFTER the double newline
+* chunked? nah, whatever. IF we have time/will
+* the body ends on........ either stopping receiving data, or reaching the counter, whichever comes first
+* if we reach the counter or more, just "PUT" what you have until the counter.
+* if we DON'T reach the counter, either on the same cycle (recv's bytes < rbuf\_size) or on the next cycle (revents == 0, connection still there like those "is this a joke" variants), we maybe throw an error?
+* how to deal with insanely huge bodies? approaching the maximum size of the string, we could start writing to a new string... have a vector of strings for that exact reason, for example. in the body parser obj. and then if the body size is reeeeeeally large, we can start writing to a temp file....................... uh.....
+* wait. is writing to a file via POST a poll-must-have operation? seems so :/ we need to add it to the fd list......... I think.............
+* we go to the response generator with the... either only parsed head, or both parsed head and parsed body.
 * at any point in time a bad request should throw badRequest (surprise), that gets to the try-catch block and gets handled appropriately

@@ -33,6 +33,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		// a body is a must-have then?
 		if (req.getMethod() == "POST")
 		{
+			_perConnArr[i]. // XXX XXX XXX stopped here lowk
 			// TODO here,, a connection object must know there's a body left to read.
 			// must have a content-length (checked in getmethod?)
 		}
@@ -133,7 +134,7 @@ void	Server::run(void)
 
 	std::cout << "Alright, starting. Ports: " << *(lPorts.begin()) << ".." << *(lPorts.end() - 1) << std::endl;
 	_running = true;
-	bool	keepalive; // XXX TODO see below
+	bool	keepalive; // XXX TODO
 	keepalive = false;
 	while (_running)
 	{
@@ -189,6 +190,7 @@ void	Server::run(void)
 								socks[j].fd = _newConnect;
 								socks[j].events = POLLIN;
 								// TODO add a connect array 'new' fill here
+								_perConnArr.push_back(new Connect);
 								break ;
 							}
 						}
@@ -295,6 +297,7 @@ void	Server::run(void)
 					for (int j = i; j < _socksN; j++)
 					{
 						_localRecvBuffers[j] = _localRecvBuffers[j + 1];
+						_perConnArr[j] = _perConnArr[j + 1];
 						socks[j].fd = socks[j + 1].fd;
 						socks[j].events = socks[j + 1].events;
 						socks[j].revents = socks[j + 1].revents;
@@ -305,6 +308,7 @@ void	Server::run(void)
 			for (int k = _socksN; k < BLOG_SIZE; k++)
 			{
 				_localRecvBuffers[k].clear();
+				delete _perConnArr[k];
 				socks[k].fd = -1;
 				socks[k].events = 0;
 				socks[k].revents = 0;
