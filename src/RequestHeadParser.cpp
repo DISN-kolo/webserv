@@ -115,7 +115,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	std::string	helper;
 	while (std::getline(s, line))
 	{
-		if (line == "\r")
+		if (line == "\r" || line == "")
 			break ;
 		pos = line.find(":");
 		if (pos == std::string::npos)
@@ -145,9 +145,17 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		}
 		if (_head.find(helper) != _head.end())
 		{
-			//                                           - 1 to rm the \r
-			_head[helper] = line.substr(pos, line.size() - 1);
-			// screw the spacing. it's optional, and it's hurting the abiility to match stuff
+			// rm the \r IF it's there
+			// if some idiotic protocol decides to plop a naked \n down there to mark like the "new line"
+			// we're gonna be like alright it's valid too yay.
+			// HOWEVER if someone is like "yoooo it would be awesome to include a \n in one of the fields"
+			// we're gonna be like nuh uuuuuuuuuuuh!! nuuuuuuuuuuuuuuuuuuhhhh uuuuuuuuuuuuuuhhh!
+			// sorry croski but it's straight to the next field.
+			if (line.find("\r") == line.size() - 1)
+			{
+				_head[helper] = line.substr(pos, line.size() - 1);
+			}
+			// rm spaces. it's optional tho
 			if (*(_head[helper].begin()) == ' ')
 				_head[helper].erase(0, _head[helper].find_first_not_of(' '));
 			if (*(_head[helper].end() - 1) == ' ')
@@ -162,6 +170,17 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	if (_method == "POST")
 	{
 		if (_head["content-length"] == "")
+		{
+			throw lengthRequired();
+		}
+		std::istringstream	cls(_head["content-length"]);
+		cls >> _contLen;
+		if (cls.fail() || cls.peek() > 0)
+		{
+			std::cout << std::setw(7) << " > " << std::flush;
+			std::cout << "Content length '" << _head["content-length"] << "' found to be bad" << std::endl;
+			throw badRequest();
+		}
 	}
 }
 

@@ -3,6 +3,7 @@
 Server::Server()
 {
 	_config = new ServerConfig();
+	_perConnArr = std::vector<Connect * >(BLOG_SIZE, NULL);
 }
 
 Server::Server(const Server & obj)
@@ -30,24 +31,52 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	try
 	{
 		RequestHeadParser		req(_localRecvBuffers[i]);
-		// a body is a must-have then?
 		if (req.getMethod() == "POST")
 		{
+			// a body is a must-have then?
+			// well, yeah iirc...
+			// so this means we won't enter this function anymore I think.
+			// we need to .erase from the newline x2 mark, and start taking in the body
+			// but that's something to consider for the run function
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
-			// XXX dinner time
+			// this vvvvvvvvvvvvvvvvvvvvvvvvvvv is for nlx2 erasure
+			// TODO move this string array to be const like in the server.hpp or something idk idc
+			size_t		nlnl;
+			std::string	nls[4];
+			nls[0] = CRLFCRLF;
+			nls[1] = LFCRLF;
+			nls[2] = CRLFLF;
+			nls[3] = LFLF;
+			for (int nli = 0; nli < 4; nli++)
+			{
+				nlnl = _localRecvBuffers[i].find(nls[nli]);
+				if (nlnl != std::string::npos)
+				{
+					_localRecvBuffers[i].erase(0, nlnl + nls[nli].size());
+					break ;
+				}
+			}
+			// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ done erasing nlx2
 		}
 		else
 		{
-			// TODO here, a regular send
+			// TODO filing notes
+			// if it's not a post and we already have a head, we should just stop --drop and roll--
+			// stop and send, I mean. or, you know, generate a proper response, cgi and all that jazz,
+			// if needed. I'm a bit scared of all the fopen business tho. where the hell do I store the
+			// fds for REAL FILES ON DISK for them to be included in poll? obviously, in the pollfd
+			// array. Thus, it needs to be not of BLOG_SIZE in len, but like x2 (to account for file-reading).
+			// and like add a new counter for "real open files" to not mess them up when doing a loop thru
+			// the fds that got poll'd.
+			ResponseGenerator	responseObject(200);
+
+			send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+			std::cout << std::setw(4) << i << " > " << std::flush;
+			std::cout << "sent:" << std::endl;
+			std::cout << responseObject.getText() << std::flush;
 		}
-		ResponseGenerator	responseObject(200);
-
-		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
-
-		std::cout << std::setw(4) << i << " > " << std::flush;
-		std::cout << "sent:" << std::endl;
-		std::cout << responseObject.getText() << std::flush;
 	}
 	catch (std::exception & e)
 	{
@@ -170,7 +199,8 @@ void	Server::run(void)
 				std::cout << "got an err/hup/val" << std::endl;
 				close(socks[i].fd);
 				socks[i].fd = -1;
-				//socks[i].events = 0;
+				delete _perConnArr[i];
+				_perConnArr[i] = NULL;
 				_compressTheArr = true;
 			}
 			else if ((socks[i].revents & POLLIN) == POLLIN)
@@ -189,8 +219,7 @@ void	Server::run(void)
 								_socksN++;
 								socks[j].fd = _newConnect;
 								socks[j].events = POLLIN;
-								// TODO add a connect array 'new' fill here
-								_perConnArr.push_back(new Connect);
+								_perConnArr[j] = new Connect;
 								break ;
 							}
 						}
@@ -206,12 +235,14 @@ void	Server::run(void)
 					if (_retCode < 0)
 					{
 						// to crash or not to crash? XXX to think
+//						throw readError();
 						close(socks[i].fd);
 						socks[i].fd = -1;
 						_compressTheArr = true;
+						delete  _perConnArr[i];
+						_perConnArr[i] = NULL;
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "_retCode " << _retCode << " but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
-//						throw readError();
 					}
 					else if (_retCode == 0)
 					{
@@ -220,7 +251,28 @@ void	Server::run(void)
 						// how do we even get here.......
 						if (_localRecvBuffers[i].size() != 0)
 						{
-							if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
+							// well, whatever. yk what's also important here? if we have an ogoing connection that needs a body, well, there should be a secret third option
+							// that gets checked first despite being the, uh third option. 
+							if (_perConnArr[i].getNeedsBody())
+							{
+								// TODO make ts a function
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Is that some sort of a joke?" << std::endl;
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "No double-enndline, AND the buff isn't zero... But nothing to read." << std::endl;
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Here should be a timeout thing instead, probably." << std::endl;
+								// TODO -----------------------^^^^^^^ (?)
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "What's worse the client wants to send a body in. Where?" << std::endl;
+								// TODO make ts a function
+								close(socks[i].fd);
+								socks[i].fd = -1;
+								_compressTheArr = true;
+								delete  _perConnArr[i];
+								_perConnArr[i] = NULL;
+							}
+							else if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
 									_localRecvBuffers[i].find(LFCRLF) != std::string::npos ||
 									_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 									_localRecvBuffers[i].find(LFLF) != std::string::npos)
@@ -239,6 +291,8 @@ void	Server::run(void)
 								close(socks[i].fd);
 								socks[i].fd = -1;
 								_compressTheArr = true;
+								delete  _perConnArr[i];
+								_perConnArr[i] = NULL;
 							}
 						}
 						else
@@ -250,11 +304,14 @@ void	Server::run(void)
 							close(socks[i].fd);
 							socks[i].fd = -1;
 							_compressTheArr = true;
+							delete  _perConnArr[i];
+							_perConnArr[i] = NULL;
 						}
 					}
 					else if (_retCode > 0)
 					{
 						// TODO: bare CR to SP replace
+						// (?)
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << RBUF_SIZE << "." << std::endl;
@@ -266,7 +323,20 @@ void	Server::run(void)
 
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "Checking for a double line-break (any combo of LF and CRLF)" << std::endl;
-						if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
+						if (_perConnArr[i].getNeedsBody())
+						{
+							if (_localRecvBuffers[i].size > _perConnArr[i].getContLen())
+							{
+								// TODO error content too long or sumn
+							}
+							else if (_localRecvBuffers[i].size == _perConnArr[i].getContLen())
+							{
+								// TODO epic victory, send response ig
+								// write the file
+								// don't forge IO multiplexing xdddddddddddddddddd kill me
+							}
+						}
+						else if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
 								_localRecvBuffers[i].find(LFCRLF) != std::string::npos ||
 								_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 								_localRecvBuffers[i].find(LFLF) != std::string::npos)
@@ -309,6 +379,7 @@ void	Server::run(void)
 			{
 				_localRecvBuffers[k].clear();
 				delete _perConnArr[k];
+				_perConnArr[k] = NULL;
 				socks[k].fd = -1;
 				socks[k].events = 0;
 				socks[k].revents = 0;

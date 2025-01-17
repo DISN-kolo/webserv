@@ -5,6 +5,7 @@
 # include "ResponseGenerator.hpp"
 # include "RequestHeadParser.hpp"
 # include "webserv.hpp"
+# include "Connect.hpp"
 
 # include <ctime>
 # include <unistd.h>
@@ -28,19 +29,19 @@ private:
 	ServerConfig		*_config;
 
 	// internal variables used for the run function
-	int								_listenSock;
-	std::vector<int>				_listenSocks;
-	std::vector<std::string>		_localRecvBuffers;
-	std::vector<Connect *>			_perConnArr;
-	int								_reuseAddressValue;
-	int 							_timeout;
-	int								_socksN;
-	int								_lstnN;
-	int								_curSize;
-	bool							_running;
-	int								_newConnect;
-	bool							_compressTheArr;
-	int								_retCode;
+	int							_listenSock;
+	std::vector<int>			_listenSocks;
+	std::vector<std::string>	_localRecvBuffers;
+	std::vector<Connect * >		_perConnArr;
+	int							_reuseAddressValue;
+	int 						_timeout;
+	int							_socksN;
+	int							_lstnN;
+	int							_curSize;
+	bool						_running;
+	int							_newConnect;
+	bool						_compressTheArr;
+	int							_retCode;
 public:
 	Server();
 	void	run(void);

@@ -15,6 +15,7 @@ ResponseGenerator::ResponseGenerator(int code)
 	ss << "Content-Length: " << cont.size() << CRLF;
 	ss << CRLF;
 	ss << cont;
+	// no vvvv ? FIXME remove it?
 	ss << CRLF;
 	_text = ss.str();
 }
@@ -30,6 +31,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat)
 	ss << "Content-Length: " << cont.size() << CRLF;
 	ss << CRLF;
 	ss << cont;
+	// no vvvv ? FIXME remove it?
 	ss << CRLF;
 	_text = ss.str();
 }

@@ -60,3 +60,7 @@ const char *badRequest::what(void) const throw()
 	return ("400 Bad Request");
 }
 
+const char *lengthRequired::what(void) const throw()
+{
+	return ("411 Length Required");
+}
