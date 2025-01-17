@@ -33,9 +33,9 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		// a body is a must-have then?
 		if (req.getMethod() == "POST")
 		{
-			_perConnArr[i]. // XXX XXX XXX stopped here lowk
-			// TODO here,, a connection object must know there's a body left to read.
-			// must have a content-length (checked in getmethod?)
+			_perConnArr[i]->setNeedsBody(true);
+			_perConnArr[i]->setContLen(req.getContLen());
+			// XXX dinner time
 		}
 		else
 		{

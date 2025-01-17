@@ -21,6 +21,14 @@ private:
 public:
 	Connect();
 	~Connect();
+
+	bool	getNeedsBody(void) const;
+	size_t	getContLen(void) const;
+	bool	getKeepAlive(void) const;
+
+	void	setNeedsBody(bool);
+	void	setContLen(size_t);
+	void	setKeepAlive(bool);
 } ;
 
 #endif

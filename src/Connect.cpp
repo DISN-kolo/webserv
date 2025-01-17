@@ -1,36 +1,54 @@
 #include "../inc/Connect.hpp"
 
 Connect::Conenct()
-	:	_localRecvBuffer("")
+	:	_needsBody(false), _contLen(0), _keepAlive(true)
 {
-}
-
-Connect::Conenct(const Connect & obj)
-{
-	(void)obj;
 }
 
 Connect &Connect::operator=(const Connect & obj)
 {
-	(void)obj;
+	_needsBody = obj.getNeedsBody();
+	_contLen = obj.getContLen();
+	_keepAlive = obj.getKeepAlive();
 	return (*this);
+}
+
+Connect::Conenct(const Connect & obj)
+{
+	*this = obj;
 }
 
 Connect::~Conenct()
 {
 }
 
-std::string	Connect::getLRB(void) const
+bool	Connect::getNeedsBody(void) const
 {
-	return (_localRecvBuffer);
+	return (_needsBody);
 }
 
-void		Connect::setLRB(std::string newBuffer)
+size_t	Connect::getContLen(void) const
 {
-	_localRecvBuffer = newBuffer;
+	return (_contLen);
 }
 
-void		Connect::clearLRB(void)
+bool	Connect::getKeepAlive(void) const
 {
-	_localRecvBuffer.clear();
+	return (_keepAlive);
+}
+
+// v for value lol
+void	Connect::setNeedsBody(bool v)
+{
+	_needsBody = v;
+}
+
+void	Connect::setContLen(size_t v)
+{
+	_contLen = v;
+}
+
+void	Connect::setKeepAlive(bool v)
+{
+	_keepAlive = v;
 }

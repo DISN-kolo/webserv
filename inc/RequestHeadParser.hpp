@@ -24,6 +24,10 @@ private:
 
 	// a dictionary of the head. if some head line isn't matching, just do a "bad request" :)
 	std::map<std::string, std::string>	_head;
+
+	// since we're gonna parse it anyways to check for the correctness of the field,
+	// why not store it for later use, to avoid parsing it twice.
+	size_t		_contLen;
 public:
 	RequestHeadParser(std::string r);
 	~RequestHeadParser();
@@ -32,5 +36,7 @@ public:
 	std::string	getMethod(void) const;
 	std::string	getRTarget(void) const;
 	std::string	getProtocol(void) const;
+
+	size_t		getContLen(void) const;
 } ;
 #endif

@@ -21,6 +21,7 @@ RequestHeadParser &RequestHeadParser::operator=(const RequestHeadParser & obj)
 RequestHeadParser::RequestHeadParser(std::string r)
 	:	_r(r)
 {
+	_contLen = 0;
 	// bare minimum as per subject
 	_acceptableMethods.push_back("GET ");
 	_acceptableMethods.push_back("POST ");
@@ -56,6 +57,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	{
 		std::cout << std::setw(7) << " > " << std::flush;
 		std::cout << "Method not found in acceptable list" << std::endl;
+		// TODO maybe 501?
 		throw badRequest();
 	}
 
@@ -157,6 +159,10 @@ RequestHeadParser::RequestHeadParser(std::string r)
 			std::cout << "Unknown line found: '" << line.substr(0, line.size() - 1) << "'" << std::endl;
 		}
 	}
+	if (_method == "POST")
+	{
+		if (_head["content-length"] == "")
+	}
 }
 
 RequestHeadParser::~RequestHeadParser()
@@ -181,4 +187,9 @@ std::string	getRTarget(void) const
 std::string	getProtocol(void) const
 {
 	return (_protocol);
+}
+
+size_t		getContLen(void) const
+{
+	return (_contLen);
 }
