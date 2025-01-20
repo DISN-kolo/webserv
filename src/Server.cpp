@@ -24,9 +24,6 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	std::cout << std::setw(4) << i << " > " << std::flush;
 	std::cout << "Total msg:" << std::endl;
 	std::cout << _localRecvBuffers[i] << std::flush;
-	// TODO parse request. results of parsing shall go to the
-	// construcor of the responder class. For now, just an int code
-	// lol
 	// TODO responder class
 	try
 	{
@@ -40,6 +37,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			// but that's something to consider for the run function
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
+			_perConnArr[i]->setKeepAlive(req.getKeepAlive()); // XXX stopped here :)
 			// this vvvvvvvvvvvvvvvvvvvvvvvvvvv is for nlx2 erasure
 			// TODO move this string array to be const like in the server.hpp or something idk idc
 			size_t		nlnl;
@@ -69,6 +67,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			// array. Thus, it needs to be not of BLOG_SIZE in len, but like x2 (to account for file-reading).
 			// and like add a new counter for "real open files" to not mess them up when doing a loop thru
 			// the fds that got poll'd.
+			// ALSO check out .... file writing! File writing is done via polling, too. No?
 			ResponseGenerator	responseObject(200);
 
 			send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
@@ -80,6 +79,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	}
 	catch (std::exception & e)
 	{
+		_perConnArr[i].setNeedsBody(false);
 		std::cout << std::setw(4) << i << " > " << std::flush;
 		std::cout << e.what() << std::endl;
 		ResponseGenerator	responseObject(e.what());
@@ -90,7 +90,10 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		std::cout << "sent:" << std::endl;
 		std::cout << responseObject.getText() << std::flush;
 	}
-	_localRecvBuffers[i].clear();
+	if (!_perConnArr[i].getNeedsBody())
+	{
+		_localRecvBuffers[i].clear();
+	}
 	bool	keepalive = false; // TODO I beg you, parse the request.
 	if (!keepalive)
 	{
