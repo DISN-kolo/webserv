@@ -467,8 +467,12 @@ void	Server::run(void)
 			for (int k = _socksN; k < BLOG_SIZE; k++)
 			{
 				_localRecvBuffers[k].clear();
-				delete _perConnArr[k];
-				_perConnArr[k] = NULL;
+				if (_perConnArr[k] != NULL)
+				{
+//					delete _perConnArr[k];
+					// wait, what if deleting messes up the whole array compression thing!!!!!!!!!!!!!!!!!!!
+					_perConnArr[k] = NULL;
+				}
 				socks[k].fd = -1;
 				socks[k].events = 0;
 				socks[k].revents = 0;

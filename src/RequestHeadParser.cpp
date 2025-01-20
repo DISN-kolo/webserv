@@ -73,11 +73,19 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	}
 
 	// HTTP/1.0 support or nah? XXX
+	// solely for apache benchmark purposes xddddddd
 	if (line.find("HTTP/1.1\r", line.size() - std::string("HTTP/1.1\r").size()) == std::string::npos)
 	{
-		std::cout << std::setw(7) << " > " << std::flush;
-		std::cout << "Bad protocol" << std::endl;
-		throw badRequest();
+		if (line.find("HTTP/1.0\r", line.size() - std::string("HTTP/1.0\r").size()) == std::string::npos)
+		{
+			std::cout << std::setw(7) << " > " << std::flush;
+			std::cout << "Bad protocol" << std::endl;
+			throw badRequest();
+		}
+		else
+		{
+			_protocol = "HTTP/1.0";
+		}
 	}
 	else
 	{
@@ -176,7 +184,14 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		*itt = std::tolower(*itt);
 		itt++;
 	}
-	_keepAlive = true;
+	if (_protocol == "HTTP/1.0")
+	{
+		_keepAlive = false;
+	}
+	else
+	{
+		_keepAlive = true;
+	}
 	if (helper.find("keep-alive") == std::string::npos)
 	{
 		if (helper.find("close") != std::string::npos)

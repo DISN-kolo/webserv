@@ -26,3 +26,10 @@
 * wait. is writing to a file via POST a poll-must-have operation? seems so :/ we need to add it to the fd list......... I think.............
 * we go to the response generator with the... either only parsed head, or both parsed head and parsed body.
 * at any point in time a bad request should throw badRequest (surprise), that gets to the try-catch block and gets handled appropriately
+
+### current bugs
+
+* ctrl+C in telnet leads to a weird timeout situation? I guess.
+* some signal combos outright crash the webserv? maybe after a considerable amount of data?
+* data reading seems to be weird. something wrong with all the ifs, we don't ever  seem to catch the size correctly.... hm.
+* just in case -- check if the local recv is cleaned after a correct req. even if body-less type.
