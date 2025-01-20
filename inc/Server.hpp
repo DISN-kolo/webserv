@@ -32,7 +32,7 @@ private:
 	int							_listenSock;
 	std::vector<int>			_listenSocks;
 	std::vector<std::string>	_localRecvBuffers;
-	std::vector< * Connect>		_perConnArr;
+	std::vector<Connect * >		_perConnArr;
 	int							_reuseAddressValue;
 	int 						_timeout;
 	int							_socksN;

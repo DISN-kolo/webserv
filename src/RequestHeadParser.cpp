@@ -212,27 +212,27 @@ std::map<std::string, std::string>	RequestHeadParser::getHead(void) const
 	return (_head);
 }
 
-std::string	getMethod(void) const
+std::string	RequestHeadParser::getMethod(void) const
 {
 	return (_method);
 }
 
-std::string	getRTarget(void) const
+std::string	RequestHeadParser::getRTarget(void) const
 {
 	return (_rTarget);
 }
 
-std::string	getProtocol(void) const
+std::string	RequestHeadParser::getProtocol(void) const
 {
 	return (_protocol);
 }
 
-size_t		getContLen(void) const
+size_t		RequestHeadParser::getContLen(void) const
 {
 	return (_contLen);
 }
 
-bool		getKeepAlive(void) const
+bool		RequestHeadParser::getKeepAlive(void) const
 {
 	return (_keepAlive);
 }

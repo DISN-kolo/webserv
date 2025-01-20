@@ -1,6 +1,6 @@
 #include "../inc/Connect.hpp"
 
-Connect::Conenct()
+Connect::Connect()
 	:	_needsBody(false), _contLen(0), _keepAlive(true)
 {
 }
@@ -13,12 +13,12 @@ Connect &Connect::operator=(const Connect & obj)
 	return (*this);
 }
 
-Connect::Conenct(const Connect & obj)
+Connect::Connect(const Connect & obj)
 {
 	*this = obj;
 }
 
-Connect::~Conenct()
+Connect::~Connect()
 {
 }
 

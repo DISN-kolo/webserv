@@ -3,7 +3,7 @@
 Server::Server()
 {
 	_config = new ServerConfig();
-	_perConnArr = std::vector< * Connect>(BLOG_SIZE, NULL);
+	_perConnArr = std::vector<Connect * >(BLOG_SIZE, NULL);
 }
 
 Server::Server(const Server & obj)
@@ -257,21 +257,21 @@ void	Server::run(void)
 						{
 							// well, whatever. yk what's also important here? if we have an ogoing connection that needs a body, well, there should be a secret third option
 							// that gets checked first despite being the, uh, "third option". oh, there it is!
-							if (_perConnArr[i].getNeedsBody())
+							if (_perConnArr[i]->getNeedsBody())
 							{
 								// TODO make ts a function
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "_retcode is 0, the local recv buffer is " << _localRecvBuffers[i].size() << ", we need a body." << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "content-length for this one is supposed to be " << _perConnArr[i].getContLen() << "..." << std::endl;
-								if (_perConnArr[i].getContLen() < _localRecvBuffers[i].size())
+								std::cout << "content-length for this one is supposed to be " << _perConnArr[i]->getContLen() << "..." << std::endl;
+								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 								{
 									_perConnArr[i]->setNeedsBody(false);
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "Content size is too big, sending a 400" << std::endl;
 									ResponseGenerator	responseObject("400 Bad Request");
 
-									send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
@@ -289,13 +289,13 @@ void	Server::run(void)
 								}
 								else
 								{
-									_perConnArr[j]->setNeedsBody(false);
+									_perConnArr[i]->setNeedsBody(false);
 									try
 									{
 										// the try catch is for having a normal response generator, which will be able to throw errors like 502
 										ResponseGenerator	responseObject(200);
 
-										send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
 										std::cout << std::setw(4) << i << " > " << std::flush;
 										std::cout << "sent:" << std::endl;
@@ -307,7 +307,7 @@ void	Server::run(void)
 										std::cout << e.what() << std::endl;
 										ResponseGenerator	responseObject(e.what());
 
-										send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
 										std::cout << std::setw(4) << i << " > " << std::flush;
 										std::cout << "sent:" << std::endl;
@@ -370,16 +370,16 @@ void	Server::run(void)
 
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "Checking for a double line-break (any combo of LF and CRLF)" << std::endl;
-						if (_perConnArr[i].getNeedsBody())
+						if (_perConnArr[i]->getNeedsBody())
 						{
-							if (_localRecvBuffers[i].size > _perConnArr[i].getContLen())
+							if (_localRecvBuffers[i].size() > _perConnArr[i]->getContLen())
 							{
 								_perConnArr[i]->setNeedsBody(false);
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "Content size is too big, sending a 400" << std::endl;
 								ResponseGenerator	responseObject("400 Bad Request");
 
-								send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "sent:" << std::endl;
@@ -394,17 +394,17 @@ void	Server::run(void)
 									_compressTheArr = true;
 								}
 							}
-							else if (_localRecvBuffers[i].size == _perConnArr[i].getContLen())
+							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
 								// TODO write the file or something idk.
 								// don't forge IO multiplexing xdddddddddddddddddd kill me
-								_perConnArr[j]->setNeedsBody(false);
+								_perConnArr[i]->setNeedsBody(false);
 								try
 								{
 									// the try catch is for having a normal response generator, which will be able to throw errors like 502
 									ResponseGenerator	responseObject(200);
 
-									send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
@@ -416,7 +416,7 @@ void	Server::run(void)
 									std::cout << e.what() << std::endl;
 									ResponseGenerator	responseObject(e.what());
 
-									send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;

@@ -1,6 +1,8 @@
 #ifndef CONNECT_HPP
 # define CONNECT_HPP
 
+# include "webserv.hpp"
+
 // connect needs to know:
 // 1. if it needs to continue (this will be known after a req head parse)
 // 2. if it does, for how long (as in N of characters)

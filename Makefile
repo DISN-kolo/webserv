@@ -5,7 +5,8 @@ SRCNAMES = main.cpp \
 		   Server.cpp \
 		   ServerConfig.cpp \
 		   ResponseGenerator.cpp \
-		   RequestHeadParser.cpp
+		   RequestHeadParser.cpp \
+		   Connect.cpp
 #		   RequestHeadParser.cpp \
 #		   RequestBodyParser.cpp
 
