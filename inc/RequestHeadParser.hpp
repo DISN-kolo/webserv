@@ -28,6 +28,7 @@ private:
 	// since we're gonna parse it anyways to check for the correctness of the field,
 	// why not store it for later use, to avoid parsing it twice.
 	size_t		_contLen;
+	bool		_keepAlive;
 public:
 	RequestHeadParser(std::string r);
 	~RequestHeadParser();
@@ -38,5 +39,7 @@ public:
 	std::string	getProtocol(void) const;
 
 	size_t		getContLen(void) const;
+
+	bool		getKeepAlive(void) const;
 } ;
 #endif

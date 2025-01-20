@@ -3,7 +3,7 @@
 Server::Server()
 {
 	_config = new ServerConfig();
-	_perConnArr = std::vector<Connect * >(BLOG_SIZE, NULL);
+	_perConnArr = std::vector< * Connect>(BLOG_SIZE, NULL);
 }
 
 Server::Server(const Server & obj)
@@ -24,10 +24,12 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	std::cout << std::setw(4) << i << " > " << std::flush;
 	std::cout << "Total msg:" << std::endl;
 	std::cout << _localRecvBuffers[i] << std::flush;
+	// in case RHP fails; keep-alive is the default for http 1.1
 	// TODO responder class
 	try
 	{
 		RequestHeadParser		req(_localRecvBuffers[i]);
+		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		if (req.getMethod() == "POST")
 		{
 			// a body is a must-have then?
@@ -37,7 +39,6 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			// but that's something to consider for the run function
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
-			_perConnArr[i]->setKeepAlive(req.getKeepAlive()); // XXX stopped here :)
 			// this vvvvvvvvvvvvvvvvvvvvvvvvvvv is for nlx2 erasure
 			// TODO move this string array to be const like in the server.hpp or something idk idc
 			size_t		nlnl;
@@ -68,6 +69,8 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			// and like add a new counter for "real open files" to not mess them up when doing a loop thru
 			// the fds that got poll'd.
 			// ALSO check out .... file writing! File writing is done via polling, too. No?
+			// ALSO check out .... just sending regular responses might require poll?????? like.... POLLOUT n stuff....... oh my gaaaaaaawddddddddddd
+			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(200);
 
 			send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
@@ -79,7 +82,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	}
 	catch (std::exception & e)
 	{
-		_perConnArr[i].setNeedsBody(false);
+		_perConnArr[i]->setNeedsBody(false);
 		std::cout << std::setw(4) << i << " > " << std::flush;
 		std::cout << e.what() << std::endl;
 		ResponseGenerator	responseObject(e.what());
@@ -90,16 +93,17 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		std::cout << "sent:" << std::endl;
 		std::cout << responseObject.getText() << std::flush;
 	}
-	if (!_perConnArr[i].getNeedsBody())
+	if (!_perConnArr[i]->getKeepAlive())
 	{
-		_localRecvBuffers[i].clear();
-	}
-	bool	keepalive = false; // TODO I beg you, parse the request.
-	if (!keepalive)
-	{
-		close(*fdp);
-		*fdp = -1;
-		_compressTheArr = true;
+		if (!_perConnArr[i]->getNeedsBody())
+		{
+			_localRecvBuffers[i].clear();
+			close(*fdp);
+			*fdp = -1;
+			delete _perConnArr[i];
+			_perConnArr[i] = NULL;
+			_compressTheArr = true;
+		}
 	}
 }
 
@@ -173,11 +177,6 @@ void	Server::run(void)
 		_retCode = poll(socks, _socksN, _timeout);
 		if (_retCode < 0)
 			throw pollError();
-//		else if (_retCode == 0)
-//		{
-//			std::cout << "Poll timeout. Byeeeee" << std::endl;
-//			return ;
-//		}
 		std::cout << "Just poll'd, socks number is " << _socksN << std::endl;
 
 		// go thru all the socks that could have possibly been affected
@@ -223,6 +222,8 @@ void	Server::run(void)
 								socks[j].fd = _newConnect;
 								socks[j].events = POLLIN;
 								_perConnArr[j] = new Connect;
+								_perConnArr[j]->setKeepAlive(true);
+								_perConnArr[j]->setNeedsBody(false);
 								break ;
 							}
 						}
@@ -255,26 +256,65 @@ void	Server::run(void)
 						if (_localRecvBuffers[i].size() != 0)
 						{
 							// well, whatever. yk what's also important here? if we have an ogoing connection that needs a body, well, there should be a secret third option
-							// that gets checked first despite being the, uh third option. 
+							// that gets checked first despite being the, uh, "third option". oh, there it is!
 							if (_perConnArr[i].getNeedsBody())
 							{
 								// TODO make ts a function
 								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Is that some sort of a joke?" << std::endl;
+								std::cout << "_retcode is 0, the local recv buffer is " << _localRecvBuffers[i].size() << ", we need a body." << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "No double-enndline, AND the buff isn't zero... But nothing to read." << std::endl;
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Here should be a timeout thing instead, probably." << std::endl;
-								// TODO -----------------------^^^^^^^ (?)
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "What's worse the client wants to send a body in. Where?" << std::endl;
-								// TODO make ts a function
-								close(socks[i].fd);
-								socks[i].fd = -1;
-								_compressTheArr = true;
-								delete  _perConnArr[i];
-								_perConnArr[i] = NULL;
-							}
+								std::cout << "content-length for this one is supposed to be " << _perConnArr[i].getContLen() << "..." << std::endl;
+								if (_perConnArr[i].getContLen() < _localRecvBuffers[i].size())
+								{
+									_perConnArr[i]->setNeedsBody(false);
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << "Content size is too big, sending a 400" << std::endl;
+									ResponseGenerator	responseObject("400 Bad Request");
+
+									send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << "sent:" << std::endl;
+									std::cout << responseObject.getText() << std::flush;
+									if (!_perConnArr[i]->getKeepAlive())
+									{
+										// used to be a needs body check here, but removed due to always being passed.
+										_localRecvBuffers[i].clear();
+										close(socks[i].fd);
+										socks[i].fd = -1;
+										delete _perConnArr[i];
+										_perConnArr[i] = NULL;
+										_compressTheArr = true;
+									}
+								}
+								else
+								{
+									_perConnArr[j]->setNeedsBody(false);
+									try
+									{
+										// the try catch is for having a normal response generator, which will be able to throw errors like 502
+										ResponseGenerator	responseObject(200);
+
+										send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+										std::cout << std::setw(4) << i << " > " << std::flush;
+										std::cout << "sent:" << std::endl;
+										std::cout << responseObject.getText() << std::flush;
+									}
+									catch (std::exception & e)
+									{
+										std::cout << std::setw(4) << i << " > " << std::flush;
+										std::cout << e.what() << std::endl;
+										ResponseGenerator	responseObject(e.what());
+
+										send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+										std::cout << std::setw(4) << i << " > " << std::flush;
+										std::cout << "sent:" << std::endl;
+										std::cout << responseObject.getText() << std::flush;
+									}
+								}
+							} /* okay, it didn't ask for a body... at least yet. maybe it's a head? */
 							else if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
 									_localRecvBuffers[i].find(LFCRLF) != std::string::npos ||
 									_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
@@ -284,6 +324,7 @@ void	Server::run(void)
 							}
 							else
 							{
+								// ok, it's not a head, there's nothing to read, and we're just there. close if needed.
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "Is that some sort of a joke?" << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
@@ -291,11 +332,14 @@ void	Server::run(void)
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "Here should be a timeout thing instead, probably." << std::endl;
 								// TODO -----------------------^^^^^^^ (?)
-								close(socks[i].fd);
-								socks[i].fd = -1;
-								_compressTheArr = true;
-								delete  _perConnArr[i];
-								_perConnArr[i] = NULL;
+								if (!_perConnArr[i]->getKeepAlive())
+								{
+									close(socks[i].fd);
+									socks[i].fd = -1;
+									_compressTheArr = true;
+									delete  _perConnArr[i];
+									_perConnArr[i] = NULL;
+								}
 							}
 						}
 						else
@@ -330,13 +374,59 @@ void	Server::run(void)
 						{
 							if (_localRecvBuffers[i].size > _perConnArr[i].getContLen())
 							{
-								// TODO error content too long or sumn
+								_perConnArr[i]->setNeedsBody(false);
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Content size is too big, sending a 400" << std::endl;
+								ResponseGenerator	responseObject("400 Bad Request");
+
+								send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "sent:" << std::endl;
+								std::cout << responseObject.getText() << std::flush;
+								if (!_perConnArr[i]->getKeepAlive())
+								{
+									_localRecvBuffers[i].clear();
+									close(socks[i].fd);
+									socks[i].fd = -1;
+									delete _perConnArr[i];
+									_perConnArr[i] = NULL;
+									_compressTheArr = true;
+								}
 							}
 							else if (_localRecvBuffers[i].size == _perConnArr[i].getContLen())
 							{
-								// TODO epic victory, send response ig
-								// write the file
+								// TODO write the file or something idk.
 								// don't forge IO multiplexing xdddddddddddddddddd kill me
+								_perConnArr[j]->setNeedsBody(false);
+								try
+								{
+									// the try catch is for having a normal response generator, which will be able to throw errors like 502
+									ResponseGenerator	responseObject(200);
+
+									send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << "sent:" << std::endl;
+									std::cout << responseObject.getText() << std::flush;
+								}
+								catch (std::exception & e)
+								{
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << e.what() << std::endl;
+									ResponseGenerator	responseObject(e.what());
+
+									send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+
+									std::cout << std::setw(4) << i << " > " << std::flush;
+									std::cout << "sent:" << std::endl;
+									std::cout << responseObject.getText() << std::flush;
+								}
+							}
+							else
+							{
+								std::cout << std::setw(4) << i << " > " << std::flush;
+								std::cout << "Content smaller than expected... continue reading thru the next cycle!!!" << std::endl;
 							}
 						}
 						else if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
@@ -352,12 +442,8 @@ void	Server::run(void)
 							std::cout << "Continue reading thru the next cycle!!!" << std::endl;
 						}
 					}
-					// keep-alive check, pls TODO
-//					close(socks[i].fd);
-//					socks[i].fd = -1;
-//					_compressTheArr = true;
 				}
-			}
+			} /* else if POLLIN. probably need to add POLLOUT later. XXX */
 		} /* for to iterate thru socks upon poll's return */
 		if (_compressTheArr)
 		{

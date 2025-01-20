@@ -167,6 +167,25 @@ RequestHeadParser::RequestHeadParser(std::string r)
 			std::cout << "Unknown line found: '" << line.substr(0, line.size() - 1) << "'" << std::endl;
 		}
 	}
+
+	// k-a managing, part 1
+	helper = _head["connection"];
+	std::string::iterator	itt = helper.begin();
+	while (itt < helper.end())
+	{
+		*itt = std::tolower(*itt);
+		itt++;
+	}
+	_keepAlive = true;
+	if (helper.find("keep-alive") == std::string::npos)
+	{
+		if (helper.find("close") != std::string::npos)
+		{
+			_keepAlive = false;
+		}
+	}
+
+	// c-l managing
 	if (_method == "POST")
 	{
 		if (_head["content-length"] == "")
@@ -211,4 +230,9 @@ std::string	getProtocol(void) const
 size_t		getContLen(void) const
 {
 	return (_contLen);
+}
+
+bool		getKeepAlive(void) const
+{
+	return (_keepAlive);
 }
