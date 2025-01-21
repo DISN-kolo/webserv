@@ -77,6 +77,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 
 			send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
 			_perConnArr[i]->setTimeStarted(time(NULL));
+			std::cout << "reset starting time on " << i << std::endl;
 
 			std::cout << std::setw(4) << i << " > " << std::flush;
 			std::cout << "sent:" << std::endl;
@@ -107,6 +108,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 
 		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
 		_perConnArr[i]->setTimeStarted(time(NULL));
+		std::cout << "reset starting time on " << i << std::endl;
 
 		std::cout << std::setw(4) << i << " > " << std::flush;
 		std::cout << "sent:" << std::endl;
@@ -177,8 +179,10 @@ void	Server::run(void)
 		socks[i].events = POLLIN;
 	}
 
-	// _timeout is measured in ms, but here we go infinitely
-	_timeout = -1;
+	// _timeout is measured in ms
+	// -1 = inf
+//	_timeout = -1;
+	_timeout = 1 * 1000;
 	_socksN = _listenSocks.size();
 	_lstnN = _socksN;
 	// newconnect's -2 is its init value while -1 indicates a fail
@@ -192,11 +196,34 @@ void	Server::run(void)
 	_running = true;
 	bool	keepalive; // XXX TODO
 	keepalive = false;
+	time_t	curTime;
 	while (_running)
 	{
 		_retCode = poll(socks, _socksN, _timeout);
 		if (_retCode < 0)
+		{
 			throw pollError();
+		}
+		else if (_retCode == 0)
+		{
+			// epic timeout checking time
+			curTime = time(NULL);
+			for (int i = _lstnN; i < _socksN; i++)
+			{
+				if (_perConnArr[i] != NULL)
+				{
+					if (_perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
+					{
+						_localRecvBuffers[i].clear();
+						close(socks[i].fd);
+						socks[i].fd = -1;
+						delete _perConnArr[i];
+						_perConnArr[i] = NULL;
+						_compressTheArr = true;
+					}
+				}
+			}
+		}
 		std::cout << "Just poll'd, socks number is " << _socksN << std::endl;
 
 		// go thru all the socks that could have possibly been affected
@@ -204,11 +231,13 @@ void	Server::run(void)
 		_curSize = _socksN;
 		for (int i = 0; i < _curSize; i++)
 		{
+			if (socks[i].fd == -1)
+				continue ;
 			if (_perConnArr[i] != NULL)
 			{
 				std::cout << std::setw(4) << i << " > " << std::flush;
-				std::cout << "time started: " << _perConnArr[i]->getTimeStarted() << ", diff with now: " << time(NULL) - _perConnArr[i]->getTimeStarted() << std::endl;
-				if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
+				std::cout << "time started: " << _perConnArr[i]->getTimeStarted() << ", diff with now: " << curTime - _perConnArr[i]->getTimeStarted() << std::endl;
+				if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
 				{
 					_localRecvBuffers[i].clear();
 					close(socks[i].fd);
@@ -262,7 +291,7 @@ void	Server::run(void)
 						_newConnect = accept(_listenSocks[i], NULL, NULL);
 					}
 				}
-				else if (socks[i].fd != -1)
+				else
 				{
 //					std::cout << "Descriptior " << socks[i].fd << " at pos " << i << " readable" << std::endl;
 					for (int j = 0; j < RBUF_SIZE + 1; j++)
@@ -305,6 +334,7 @@ void	Server::run(void)
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 									_perConnArr[i]->setTimeStarted(time(NULL));
+									std::cout << "reset starting time on " << i << std::endl;
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
@@ -333,6 +363,7 @@ void	Server::run(void)
 
 										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 										_perConnArr[i]->setTimeStarted(time(NULL));
+										std::cout << "reset starting time on " << i << std::endl;
 
 										std::cout << std::setw(4) << i << " > " << std::flush;
 										std::cout << "sent:" << std::endl;
@@ -347,6 +378,7 @@ void	Server::run(void)
 
 										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 										_perConnArr[i]->setTimeStarted(time(NULL));
+										std::cout << "reset starting time on " << i << std::endl;
 
 										std::cout << std::setw(4) << i << " > " << std::flush;
 										std::cout << "sent:" << std::endl;
@@ -368,10 +400,9 @@ void	Server::run(void)
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "Is that some sort of a joke?" << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "No double-enndline, AND the buff isn't zero... But nothing to read." << std::endl;
+								std::cout << "No double-endline, AND the buff isn't zero... But nothing to read." << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "Timeout-checking..." << std::endl;
-								// TODO -----------------------^^^^^^^ (?)
 								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									std::cout << "       yup, close it." << std::endl;
@@ -400,6 +431,7 @@ void	Server::run(void)
 					{
 						// every successful recv we reset the timer
 						_perConnArr[i]->setTimeStarted(time(NULL));
+						std::cout << "reset starting time on " << i << std::endl;
 						// TODO: bare CR to SP replace
 						// (?)
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
@@ -424,6 +456,7 @@ void	Server::run(void)
 
 								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 								_perConnArr[i]->setTimeStarted(time(NULL));
+								std::cout << "reset starting time on " << i << std::endl;
 
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "sent:" << std::endl;
@@ -451,6 +484,7 @@ void	Server::run(void)
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 									_perConnArr[i]->setTimeStarted(time(NULL));
+									std::cout << "reset starting time on " << i << std::endl;
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
@@ -465,6 +499,7 @@ void	Server::run(void)
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 									_perConnArr[i]->setTimeStarted(time(NULL));
+									std::cout << "reset starting time on " << i << std::endl;
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;

@@ -26,7 +26,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	_acceptableMethods.push_back("GET ");
 	_acceptableMethods.push_back("POST ");
 	_acceptableMethods.push_back("DELETE ");
-	_head["connection"] = "keep-alive";
+	_head["connection"] = "";
 	// parsing this seems like pain, why not just ka forever by default? okay, 30s if we implement the timer
 	_head["keep-alive"] = "";
 	_head["content-length"] = "";
@@ -184,19 +184,25 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		*itt = std::tolower(*itt);
 		itt++;
 	}
+	// default k-a values
 	if (_protocol == "HTTP/1.0")
 	{
 		_keepAlive = false;
+		// and now to actually check the header...
+		if (helper.find("keep-alive") != std::string::npos)
+		{
+			_keepAlive = true;
+		}
 	}
 	else
 	{
 		_keepAlive = true;
-	}
-	if (helper.find("keep-alive") == std::string::npos)
-	{
-		if (helper.find("close") != std::string::npos)
+		if (helper.find("keep-alive") == std::string::npos)
 		{
-			_keepAlive = false;
+			if (helper.find("close") != std::string::npos)
+			{
+				_keepAlive = false;
+			}
 		}
 	}
 
