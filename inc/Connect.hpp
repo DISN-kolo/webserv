@@ -19,7 +19,8 @@ private:
 	bool	_needsBody;
 	size_t	_contLen;
 	bool	_keepAlive;
-
+	time_t	_timeStarted;
+	time_t	_kaTimeout;
 public:
 	Connect();
 	~Connect();
@@ -27,10 +28,14 @@ public:
 	bool	getNeedsBody(void) const;
 	size_t	getContLen(void) const;
 	bool	getKeepAlive(void) const;
+	time_t	getTimeStarted(void) const;
+	time_t	getKaTimeout(void) const;
 
-	void	setNeedsBody(bool);
-	void	setContLen(size_t);
-	void	setKeepAlive(bool);
+	void	setNeedsBody(bool v);
+	void	setContLen(size_t v);
+	void	setKeepAlive(bool v);
+	void	setTimeStarted(time_t v);
+	void	setKaTimeout(time_t v);
 } ;
 
 #endif

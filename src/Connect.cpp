@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5)
 {
 }
 
@@ -37,6 +37,16 @@ bool	Connect::getKeepAlive(void) const
 	return (_keepAlive);
 }
 
+time_t	Connect::getTimeStarted(void) const
+{
+	return (_timeStarted);
+}
+
+time_t	Connect::getKaTimeout(void) const
+{
+	return (_kaTimeout);
+}
+
 // v for value lol
 void	Connect::setNeedsBody(bool v)
 {
@@ -51,4 +61,14 @@ void	Connect::setContLen(size_t v)
 void	Connect::setKeepAlive(bool v)
 {
 	_keepAlive = v;
+}
+
+void	Connect::setTimeStarted(time_t v)
+{
+	_timeStarted = v;
+}
+
+void	Connect::setKaTimeout(time_t v)
+{
+	_kaTimeout = v;
 }

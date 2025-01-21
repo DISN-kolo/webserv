@@ -28,7 +28,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	_acceptableMethods.push_back("DELETE ");
 	_head["connection"] = "keep-alive";
 	// parsing this seems like pain, why not just ka forever by default? okay, 30s if we implement the timer
-//	_head["keep-alive"] = "";
+	_head["keep-alive"] = "";
 	_head["content-length"] = "";
 	// who cares
 //	_head["content-type"] = "";
@@ -129,7 +129,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		if (pos == std::string::npos)
 		{
 			std::cout << std::setw(7) << " > " << std::flush;
-			std::cout << "Didn't find a semi-colon in '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+			std::cout << "Didn't find a colon in '" << line.substr(0, line.size() - 1) << "'" << std::endl;
 			throw badRequest();
 		}
 		helper = line.substr(0, pos);
@@ -200,6 +200,12 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		}
 	}
 
+	// time to manage k-a parameters
+	//"keep-alive: thing=value,thing=value"
+	// or maybe later TODO
+	// keep-alive timeout in seconds by default shall be:
+	_kaTimeout = 5;
+
 	// c-l managing
 	if (_method == "POST")
 	{
@@ -250,4 +256,9 @@ size_t		RequestHeadParser::getContLen(void) const
 bool		RequestHeadParser::getKeepAlive(void) const
 {
 	return (_keepAlive);
+}
+
+time_t		RequestHeadParser::getKaTimeout(void) const
+{
+	return (_kaTimeout);
 }

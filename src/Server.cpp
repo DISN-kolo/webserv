@@ -30,12 +30,13 @@ void	Server::_onHeadLocated(int i, int *fdp)
 	{
 		RequestHeadParser		req(_localRecvBuffers[i]);
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
+		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
 		if (req.getMethod() == "POST")
 		{
 			// a body is a must-have then?
 			// well, yeah iirc...
 			// so this means we won't enter this function anymore I think.
-			// we need to .erase from the newline x2 mark, and start taking in the body
+			// we need to .erase up to the newline x2 mark (inclusive), and start taking in the body
 			// but that's something to consider for the run function
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
@@ -74,6 +75,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			ResponseGenerator	responseObject(200);
 
 			send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+			_perConnArr[i]->setTimeStarted(time(NULL));
 
 			std::cout << std::setw(4) << i << " > " << std::flush;
 			std::cout << "sent:" << std::endl;
@@ -88,6 +90,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		ResponseGenerator	responseObject(e.what());
 
 		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
+		_perConnArr[i]->setTimeStarted(time(NULL));
 
 		std::cout << std::setw(4) << i << " > " << std::flush;
 		std::cout << "sent:" << std::endl;
@@ -222,8 +225,6 @@ void	Server::run(void)
 								socks[j].fd = _newConnect;
 								socks[j].events = POLLIN;
 								_perConnArr[j] = new Connect;
-								_perConnArr[j]->setKeepAlive(true);
-								_perConnArr[j]->setNeedsBody(false);
 								break ;
 							}
 						}
@@ -276,7 +277,7 @@ void	Server::run(void)
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
 									std::cout << responseObject.getText() << std::flush;
-									if (!_perConnArr[i]->getKeepAlive())
+									if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() > time(NULL) - _perConnArr[i]->getTimeStarted())
 									{
 										// used to be a needs body check here, but removed due to always being passed.
 										_localRecvBuffers[i].clear();
@@ -332,7 +333,7 @@ void	Server::run(void)
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "Here should be a timeout thing instead, probably." << std::endl;
 								// TODO -----------------------^^^^^^^ (?)
-								if (!_perConnArr[i]->getKeepAlive())
+								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() > time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									close(socks[i].fd);
 									socks[i].fd = -1;
@@ -357,6 +358,8 @@ void	Server::run(void)
 					}
 					else if (_retCode > 0)
 					{
+						// every successful recv we reset the timer
+						_perConnArr[i]->setTimeStarted(time(NULL));
 						// TODO: bare CR to SP replace
 						// (?)
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
@@ -380,11 +383,12 @@ void	Server::run(void)
 								ResponseGenerator	responseObject("400 Bad Request");
 
 								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+								_perConnArr[i]->setTimeStarted(time(NULL));
 
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "sent:" << std::endl;
 								std::cout << responseObject.getText() << std::flush;
-								if (!_perConnArr[i]->getKeepAlive())
+								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() > time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									_localRecvBuffers[i].clear();
 									close(socks[i].fd);
@@ -405,6 +409,7 @@ void	Server::run(void)
 									ResponseGenerator	responseObject(200);
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+									_perConnArr[i]->setTimeStarted(time(NULL));
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
@@ -417,6 +422,7 @@ void	Server::run(void)
 									ResponseGenerator	responseObject(e.what());
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+									_perConnArr[i]->setTimeStarted(time(NULL));
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;

@@ -29,6 +29,7 @@ private:
 	// why not store it for later use, to avoid parsing it twice.
 	size_t		_contLen;
 	bool		_keepAlive;
+	time_t		_kaTimeout;
 public:
 	RequestHeadParser(std::string r);
 	~RequestHeadParser();
@@ -41,5 +42,6 @@ public:
 	size_t		getContLen(void) const;
 
 	bool		getKeepAlive(void) const;
+	time_t		getKaTimeout(void) const;
 } ;
 #endif
