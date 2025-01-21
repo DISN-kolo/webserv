@@ -58,6 +58,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 				}
 			}
 			// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ done erasing nlx2
+			// SEE THE SAME THING A BIT BELOW TOO PLS PLS XXX XXX
 		}
 		else
 		{
@@ -80,6 +81,21 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			std::cout << std::setw(4) << i << " > " << std::flush;
 			std::cout << "sent:" << std::endl;
 			std::cout << responseObject.getText() << std::flush;
+			size_t		nlnl;
+			std::string	nls[4];
+			nls[0] = CRLFCRLF;
+			nls[1] = LFCRLF;
+			nls[2] = CRLFLF;
+			nls[3] = LFLF;
+			for (int nli = 0; nli < 4; nli++)
+			{
+				nlnl = _localRecvBuffers[i].find(nls[nli]);
+				if (nlnl != std::string::npos)
+				{
+					_localRecvBuffers[i].erase(0, nlnl + nls[nli].size());
+					break ;
+				}
+			}
 		}
 	}
 	catch (std::exception & e)
@@ -95,6 +111,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		std::cout << std::setw(4) << i << " > " << std::flush;
 		std::cout << "sent:" << std::endl;
 		std::cout << responseObject.getText() << std::flush;
+		_localRecvBuffers[i].clear();
 	}
 	if (!_perConnArr[i]->getKeepAlive())
 	{
@@ -287,10 +304,12 @@ void	Server::run(void)
 									ResponseGenerator	responseObject("400 Bad Request");
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+									_perConnArr[i]->setTimeStarted(time(NULL));
 
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
 									std::cout << responseObject.getText() << std::flush;
+									_localRecvBuffers[i].clear();
 									if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 									{
 										// used to be a needs body check here, but removed due to always being passed.
@@ -308,13 +327,17 @@ void	Server::run(void)
 									try
 									{
 										// the try catch is for having a normal response generator, which will be able to throw errors like 502
+										// trim the body here
+//										someMythicalStringThatWillHoldTheBodyForUseByServer = _localRecvBuffers[i].substr(0, _perConnArr[i]->getContLen());
 										ResponseGenerator	responseObject(200);
 
 										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+										_perConnArr[i]->setTimeStarted(time(NULL));
 
 										std::cout << std::setw(4) << i << " > " << std::flush;
 										std::cout << "sent:" << std::endl;
 										std::cout << responseObject.getText() << std::flush;
+										_localRecvBuffers[i].clear();
 									}
 									catch (std::exception & e)
 									{
@@ -323,10 +346,12 @@ void	Server::run(void)
 										ResponseGenerator	responseObject(e.what());
 
 										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
+										_perConnArr[i]->setTimeStarted(time(NULL));
 
 										std::cout << std::setw(4) << i << " > " << std::flush;
 										std::cout << "sent:" << std::endl;
 										std::cout << responseObject.getText() << std::flush;
+										_localRecvBuffers[i].clear();
 									}
 								}
 							} /* okay, it didn't ask for a body... at least yet. maybe it's a head? */
@@ -403,6 +428,7 @@ void	Server::run(void)
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "sent:" << std::endl;
 								std::cout << responseObject.getText() << std::flush;
+								_localRecvBuffers[i].clear();
 								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									_localRecvBuffers[i].clear();
@@ -429,6 +455,7 @@ void	Server::run(void)
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
 									std::cout << responseObject.getText() << std::flush;
+									_localRecvBuffers[i].clear();
 								}
 								catch (std::exception & e)
 								{
@@ -442,6 +469,7 @@ void	Server::run(void)
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
 									std::cout << responseObject.getText() << std::flush;
+									_localRecvBuffers[i].clear();
 								}
 							}
 							else
