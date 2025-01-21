@@ -187,6 +187,20 @@ void	Server::run(void)
 		_curSize = _socksN;
 		for (int i = 0; i < _curSize; i++)
 		{
+			if (_perConnArr[i] != NULL)
+			{
+				std::cout << std::setw(4) << i << " > " << std::flush;
+				std::cout << "time started: " << _perConnArr[i]->getTimeStarted() << ", diff with now: " << time(NULL) - _perConnArr[i]->getTimeStarted() << std::endl;
+				if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
+				{
+					_localRecvBuffers[i].clear();
+					close(socks[i].fd);
+					socks[i].fd = -1;
+					delete _perConnArr[i];
+					_perConnArr[i] = NULL;
+					_compressTheArr = true;
+				}
+			}
 			if (socks[i].revents == 0)
 			{
 				std::cout << "revents on " << i << " is 0" << std::endl;
@@ -277,7 +291,7 @@ void	Server::run(void)
 									std::cout << std::setw(4) << i << " > " << std::flush;
 									std::cout << "sent:" << std::endl;
 									std::cout << responseObject.getText() << std::flush;
-									if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() > time(NULL) - _perConnArr[i]->getTimeStarted())
+									if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 									{
 										// used to be a needs body check here, but removed due to always being passed.
 										_localRecvBuffers[i].clear();
@@ -331,10 +345,11 @@ void	Server::run(void)
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "No double-enndline, AND the buff isn't zero... But nothing to read." << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Here should be a timeout thing instead, probably." << std::endl;
+								std::cout << "Timeout-checking..." << std::endl;
 								// TODO -----------------------^^^^^^^ (?)
-								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() > time(NULL) - _perConnArr[i]->getTimeStarted())
+								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
+									std::cout << "       yup, close it." << std::endl;
 									close(socks[i].fd);
 									socks[i].fd = -1;
 									_compressTheArr = true;
@@ -388,7 +403,7 @@ void	Server::run(void)
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "sent:" << std::endl;
 								std::cout << responseObject.getText() << std::flush;
-								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() > time(NULL) - _perConnArr[i]->getTimeStarted())
+								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									_localRecvBuffers[i].clear();
 									close(socks[i].fd);
