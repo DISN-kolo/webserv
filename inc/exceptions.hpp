@@ -3,6 +3,12 @@
 
 # include <exception>
 
+class	configFileException : public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	socketUnopenedError : public std::exception
 {
 	public:

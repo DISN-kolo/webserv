@@ -1,5 +1,11 @@
 #include "../inc/exceptions.hpp"
 
+
+const char *configFileException::what(void) const throw()
+{
+	return ("Config file error: unable to open file");
+}
+
 const char *socketUnopenedError::what(void) const throw()
 {
 	return ("Socket error: unable to open");

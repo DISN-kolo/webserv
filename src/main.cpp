@@ -2,8 +2,19 @@
 
 int	main(int argc, char **argv)
 {
-	(void)argc;
-	(void)argv;
+	ServerConfig	*config = NULL;
+	
+	try {
+
+		if (argc == 1)
+			*config = ServerConfig();
+		else if (argc == 2)
+			*config = ServerConfig(argv[1]);
+	} catch (std::exception &err)
+	{
+		std::cout << err.what() << std::endl;
+	}
+
 	/*
 	std::map<short, std::string> pe;
 	for (short enumval = 0; enumval < POLLWRBAND*2; enumval++)
@@ -22,7 +33,6 @@ int	main(int argc, char **argv)
     pe[POLLRDBAND] = "POLLRDBAND";
     pe[POLLWRNORM] = "POLLWRNORM";
     pe[POLLWRBAND] = "POLLWRBAND";
-	*/
 	// port setup TODO this has to be done using config
 	try
 	{
@@ -35,7 +45,6 @@ int	main(int argc, char **argv)
 		std::cerr << e.what() << std::endl;
 	}
 
-	/*
 	int	port1;
 	int	port2;
 	std::vector<int>	ports;
