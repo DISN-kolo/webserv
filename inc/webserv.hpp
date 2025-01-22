@@ -32,13 +32,5 @@ class ServerConfig ;
 #  define CRLFCRLF "\r\n\r\n"
 # endif
 
-# ifndef RBUF_SIZE
-#  define RBUF_SIZE 4096
-# endif
-
-# ifndef BLOG_SIZE
-#  define BLOG_SIZE 4096
-# endif
-
 # include "exceptions.hpp"
 #endif

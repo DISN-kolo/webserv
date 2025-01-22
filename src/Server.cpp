@@ -2,8 +2,11 @@
 
 Server::Server()
 {
+	_rbufSize = 4096;
+	_sbufSize = 4096;
+	_blogSize = 4096;
 	_config = new ServerConfig();
-	_perConnArr = std::vector<Connect * >(BLOG_SIZE, NULL);
+	_perConnArr = std::vector<Connect * >(_blogSize, NULL);
 	_nls.push_back(CRLFCRLF);
 	_nls.push_back(LFCRLF);
 	_nls.push_back(CRLFLF);
@@ -85,7 +88,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			// stop and send, I mean. or, you know, generate a proper response, cgi and all that jazz,
 			// if needed. I'm a bit scared of all the fopen business tho. where the hell do I store the
 			// fds for REAL FILES ON DISK for them to be included in poll? obviously, in the pollfd
-			// array. Thus, it needs to be not of BLOG_SIZE in len, but like x2 (to account for file-reading).
+			// array. Thus, it needs to be not of _blogSize in len, but like x2 (to account for file-reading).
 			// and like add a new counter for "real open files" to not mess them up when doing a loop thru
 			// the fds that got poll'd.
 			// ALSO check out .... file writing! File writing is done via polling, too. No?
@@ -155,14 +158,31 @@ void	Server::run(void)
 			throw bindError();
 
 		// listen up!
-		if (listen(_listenSock, BLOG_SIZE) < 0)
+		if (listen(_listenSock, _blogSize) < 0)
 			throw listenError();
 
 		_listenSocks.push_back(_listenSock);
 	}
 	// make an array of poll's structs
-	struct pollfd	socks[BLOG_SIZE];
-	for (int x = 0; x < BLOG_SIZE; x++)
+	struct pollfd	socks[_listenSocks.size() + _blogSize * 4];
+	// looks like (max sizes. keep in mind that we'll be shrinking ts dynamically to help poll iterate thru only
+	//the active fds instead of a mix of fds and -1s)
+	// [0                        ...                 _lS.size) -- for listening sockets
+	// [_lS.size                 ...     _lS.size + _blogSize) -- for accepted connections, where we recv() from
+	// [_ls.size + _blogSize     ... _ls.size + _blogSize * 2) -- for accepted connections, where we send() to
+	// [_ls.size + _blogSize * 2 ... _ls.size + _blogSize * 3) -- for accepted connections, where we write submitted files to.
+	//probably, CGI related writes too, since they sorta replace the regular file-writing.
+	// [_ls.size + _blogSize * 3 ... _ls.size + _blogSize * 4) -- for accepted connections, where we read requested files from.
+	//probably, CGI related reads too, since they sorta replace the regular file-reading.
+	/*
+	_boundRecv = _listenSocks.size() + _blogSize;
+	_boundSend = _listenSocks.size() + _blogSize * 2;
+	_boundFWri = _listenSocks.size() + _blogSize * 3;
+	_boundFRea = _listenSocks.size() + _blogSize * 4;
+	// has to be dynamic down the line, probably. for cleaning and iterating purposes, of course, but you get the idea. like,
+	// set it every new iteration of the cycle, like with curSize.
+	*/
+	for (int x = 0; x < _listenSocks.size() + _blogSize * 4; x++)
 	{
 		socks[x].fd = -1;
 		socks[x].events = 0;
@@ -185,26 +205,23 @@ void	Server::run(void)
 	// newconnect's -2 is its init value while -1 indicates a fail
 	_newConnect = -2;
 	_compressTheArr = false;
-	char	buf[RBUF_SIZE + 1];
+	char	buf[_rbufSize + 1];
 	// this will store what we read because we shall be able to read in multiple passes before closing the connection.
-	_localRecvBuffers = std::vector<std::string>(BLOG_SIZE, "");
+	_localRecvBuffers = std::vector<std::string>(_blogSize, "");
 
 	std::cout << "Alright, starting. Ports: " << *(lPorts.begin()) << ".." << *(lPorts.end() - 1) << std::endl;
 	_running = true;
-	bool	keepalive; // XXX TODO
-	keepalive = false;
 	time_t	curTime;
 	while (_running)
 	{
 		_retCode = poll(socks, _socksN, _timeout);
+		curTime = time(NULL);
 		if (_retCode < 0)
 		{
 			throw pollError();
 		}
 		else if (_retCode == 0)
 		{
-			// epic timeout checking time
-			curTime = time(NULL);
 			for (int i = _lstnN; i < _socksN; i++)
 			{
 				if (_perConnArr[i] != NULL)
@@ -259,7 +276,7 @@ void	Server::run(void)
 					while (_newConnect > 0)
 					{
 //						std::cout << "Accepted to " << _newConnect << std::endl;
-						for (int j = _lstnN; j < BLOG_SIZE; j++)
+						for (int j = _lstnN; j < _blogSize; j++)
 						{
 							if (socks[j].fd == -1)
 							{
@@ -276,9 +293,9 @@ void	Server::run(void)
 				else
 				{
 //					std::cout << "Descriptior " << socks[i].fd << " at pos " << i << " readable" << std::endl;
-					for (int j = 0; j < RBUF_SIZE + 1; j++)
+					for (int j = 0; j < _rbufSize + 1; j++)
 						buf[j] = 0;
-					_retCode = recv(socks[i].fd, buf, RBUF_SIZE, 0);
+					_retCode = recv(socks[i].fd, buf, _rbufSize, 0);
 					if (_retCode < 0)
 					{
 						// to crash or not to crash? XXX to think
@@ -390,7 +407,7 @@ void	Server::run(void)
 						// (?)
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
 						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << RBUF_SIZE << "." << std::endl;
+						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << _rbufSize << "." << std::endl;
 						_debugMsgI(i, "received:");
 						buf[_retCode] = 0;
 						std::cout << buf << std::endl;
@@ -489,7 +506,7 @@ void	Server::run(void)
 					i--;
 				}
 			}
-			for (int k = _socksN; k < BLOG_SIZE; k++)
+			for (int k = _socksN; k < _blogSize; k++)
 			{
 				_localRecvBuffers[k].clear();
 				if (_perConnArr[k] != NULL)

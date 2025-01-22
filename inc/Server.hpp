@@ -36,6 +36,10 @@ private:
 	void	_debugMsgTimeI(int i, time_t curTime);
 
 	ServerConfig		*_config;
+	// temporary until config is availabe;
+	int	_rbufSize;
+	int	_sbufSize;
+	int	_blogSize;
 
 
 	// internal variables used for the run function and its subfunctions
