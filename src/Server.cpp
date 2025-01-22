@@ -4,6 +4,10 @@ Server::Server()
 {
 	_config = new ServerConfig();
 	_perConnArr = std::vector<Connect * >(BLOG_SIZE, NULL);
+	_nls.push_back(CRLFCRLF);
+	_nls.push_back(LFCRLF);
+	_nls.push_back(CRLFLF);
+	_nls.push_back(LFLF);
 }
 
 Server::Server(const Server & obj)
@@ -17,12 +21,44 @@ Server &Server::operator=(const Server & obj)
 	return (*this);
 }
 
-void	Server::_onHeadLocated(int i, int *fdp)
+void	Server::_debugMsgI(int i, std::string msg)
 {
 	std::cout << std::setw(4) << i << " > " << std::flush;
-	std::cout << "Head located. Stop reading for a moment" << std::endl;
+	std::cout << msg << std::endl;
+}
+
+void	Server::_debugMsgTimeI(int i, time_t curTime)
+{
 	std::cout << std::setw(4) << i << " > " << std::flush;
-	std::cout << "Total msg:" << std::endl;
+	std::cout << "time started: " << _perConnArr[i]->getTimeStarted() << ", diff with now: " << curTime - _perConnArr[i]->getTimeStarted() << std::endl;
+}
+
+void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
+{
+	for (int nli = 0; nli < 4; nli++)
+	{
+		_nlnl = _localRecvBuffers[i].find(_nls[nli]);
+		if (_nlnl != std::string::npos)
+		{
+			_localRecvBuffers[i].erase(0, _nlnl + _nls[nli].size());
+			break ;
+		}
+	}
+}
+
+void	Server::_purgeOneConnection(int i, int *fdp)
+{
+	close(*fdp);
+	*fdp = -1;
+	delete _perConnArr[i];
+	_perConnArr[i] = NULL;
+	_compressTheArr = true;
+}
+
+void	Server::_onHeadLocated(int i, int *fdp)
+{
+	_debugMsgI(i, "Head located. Stop reading for a moment");
+	_debugMsgI(i, "Total msg:");
 	std::cout << _localRecvBuffers[i] << std::flush;
 	// in case RHP fails; keep-alive is the default for http 1.1
 	// TODO responder class
@@ -40,25 +76,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			// but that's something to consider for the run function
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
-			// this vvvvvvvvvvvvvvvvvvvvvvvvvvv is for nlx2 erasure
-			// TODO move this string array to be const like in the server.hpp or something idk idc
-			size_t		nlnl;
-			std::string	nls[4];
-			nls[0] = CRLFCRLF;
-			nls[1] = LFCRLF;
-			nls[2] = CRLFLF;
-			nls[3] = LFLF;
-			for (int nli = 0; nli < 4; nli++)
-			{
-				nlnl = _localRecvBuffers[i].find(nls[nli]);
-				if (nlnl != std::string::npos)
-				{
-					_localRecvBuffers[i].erase(0, nlnl + nls[nli].size());
-					break ;
-				}
-			}
-			// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ done erasing nlx2
-			// SEE THE SAME THING A BIT BELOW TOO PLS PLS XXX XXX
+			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
 		else
 		{
@@ -79,39 +97,22 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			_perConnArr[i]->setTimeStarted(time(NULL));
 			std::cout << "reset starting time on " << i << std::endl;
 
-			std::cout << std::setw(4) << i << " > " << std::flush;
-			std::cout << "sent:" << std::endl;
+			_debugMsgI(i, "sent:");
 			std::cout << responseObject.getText() << std::flush;
-			size_t		nlnl;
-			std::string	nls[4];
-			nls[0] = CRLFCRLF;
-			nls[1] = LFCRLF;
-			nls[2] = CRLFLF;
-			nls[3] = LFLF;
-			for (int nli = 0; nli < 4; nli++)
-			{
-				nlnl = _localRecvBuffers[i].find(nls[nli]);
-				if (nlnl != std::string::npos)
-				{
-					_localRecvBuffers[i].erase(0, nlnl + nls[nli].size());
-					break ;
-				}
-			}
+			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
 	}
 	catch (std::exception & e)
 	{
 		_perConnArr[i]->setNeedsBody(false);
-		std::cout << std::setw(4) << i << " > " << std::flush;
-		std::cout << e.what() << std::endl;
+		_debugMsgI(i, e.what());
 		ResponseGenerator	responseObject(e.what());
 
 		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
 		_perConnArr[i]->setTimeStarted(time(NULL));
 		std::cout << "reset starting time on " << i << std::endl;
 
-		std::cout << std::setw(4) << i << " > " << std::flush;
-		std::cout << "sent:" << std::endl;
+		_debugMsgI(i, "sent:");
 		std::cout << responseObject.getText() << std::flush;
 		_localRecvBuffers[i].clear();
 	}
@@ -120,11 +121,7 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		if (!_perConnArr[i]->getNeedsBody())
 		{
 			_localRecvBuffers[i].clear();
-			close(*fdp);
-			*fdp = -1;
-			delete _perConnArr[i];
-			_perConnArr[i] = NULL;
-			_compressTheArr = true;
+			_purgeOneConnection(i, fdp);
 		}
 	}
 }
@@ -215,11 +212,7 @@ void	Server::run(void)
 					if (_perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
 					{
 						_localRecvBuffers[i].clear();
-						close(socks[i].fd);
-						socks[i].fd = -1;
-						delete _perConnArr[i];
-						_perConnArr[i] = NULL;
-						_compressTheArr = true;
+						_purgeOneConnection(i, &(socks[i].fd));
 					}
 				}
 			}
@@ -235,16 +228,11 @@ void	Server::run(void)
 				continue ;
 			if (_perConnArr[i] != NULL)
 			{
-				std::cout << std::setw(4) << i << " > " << std::flush;
-				std::cout << "time started: " << _perConnArr[i]->getTimeStarted() << ", diff with now: " << curTime - _perConnArr[i]->getTimeStarted() << std::endl;
+				_debugMsgTimeI(i, curTime);
 				if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
 				{
 					_localRecvBuffers[i].clear();
-					close(socks[i].fd);
-					socks[i].fd = -1;
-					delete _perConnArr[i];
-					_perConnArr[i] = NULL;
-					_compressTheArr = true;
+					_purgeOneConnection(i, &(socks[i].fd));
 				}
 			}
 			if (socks[i].revents == 0)
@@ -256,17 +244,11 @@ void	Server::run(void)
 			{
 				if (i < _lstnN)
 				{
-					std::cout << std::setw(4) << i << " > " << std::flush;
-					std::cout << "_listenSock got a pollerr or a pollhup or an nval" << std::endl;
+					_debugMsgI(i, "_listenSock got a pollerr or a pollhup or an nval");
 					continue ;
 				}
-				std::cout << std::setw(4) << i << " > " << std::flush;
-				std::cout << "got an err/hup/val" << std::endl;
-				close(socks[i].fd);
-				socks[i].fd = -1;
-				delete _perConnArr[i];
-				_perConnArr[i] = NULL;
-				_compressTheArr = true;
+				_debugMsgI(i, "got an err/hup/val");
+				_purgeOneConnection(i, &(socks[i].fd));
 			}
 			else if ((socks[i].revents & POLLIN) == POLLIN)
 			{
@@ -301,18 +283,13 @@ void	Server::run(void)
 					{
 						// to crash or not to crash? XXX to think
 //						throw readError();
-						close(socks[i].fd);
-						socks[i].fd = -1;
-						_compressTheArr = true;
-						delete  _perConnArr[i];
-						_perConnArr[i] = NULL;
+						_purgeOneConnection(i, &(socks[i].fd));
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "_retCode " << _retCode << " but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 					}
 					else if (_retCode == 0)
 					{
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "_retCode is 0, but poll says POLLIN and no errors(?). Maybe we forgot to clean up?" << std::endl;
+						_debugMsgI(i, "_retCode is 0, but poll says POLLIN and no errors(?). Maybe we forgot to clean up?");
 						// how do we even get here.......
 						if (_localRecvBuffers[i].size() != 0)
 						{
@@ -320,7 +297,6 @@ void	Server::run(void)
 							// that gets checked first despite being the, uh, "third option". oh, there it is!
 							if (_perConnArr[i]->getNeedsBody())
 							{
-								// TODO make ts a function
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "_retcode is 0, the local recv buffer is " << _localRecvBuffers[i].size() << ", we need a body." << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
@@ -328,27 +304,21 @@ void	Server::run(void)
 								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 								{
 									_perConnArr[i]->setNeedsBody(false);
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << "Content size is too big, sending a 400" << std::endl;
+									_debugMsgI(i, "Content size is too big, sending a 400");
 									ResponseGenerator	responseObject("400 Bad Request");
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 									_perConnArr[i]->setTimeStarted(time(NULL));
-									std::cout << "reset starting time on " << i << std::endl;
+									_debugMsgI(i, "reset starting time");
 
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << "sent:" << std::endl;
+									_debugMsgI(i, "sent:");
 									std::cout << responseObject.getText() << std::flush;
 									_localRecvBuffers[i].clear();
 									if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 									{
 										// used to be a needs body check here, but removed due to always being passed.
 										_localRecvBuffers[i].clear();
-										close(socks[i].fd);
-										socks[i].fd = -1;
-										delete _perConnArr[i];
-										_perConnArr[i] = NULL;
-										_compressTheArr = true;
+										_purgeOneConnection(i, &(socks[i].fd));
 									}
 								}
 								else
@@ -363,25 +333,22 @@ void	Server::run(void)
 
 										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 										_perConnArr[i]->setTimeStarted(time(NULL));
-										std::cout << "reset starting time on " << i << std::endl;
+										_debugMsgI(i, "reset starting time");
 
-										std::cout << std::setw(4) << i << " > " << std::flush;
-										std::cout << "sent:" << std::endl;
+										_debugMsgI(i, "sent:");
 										std::cout << responseObject.getText() << std::flush;
 										_localRecvBuffers[i].clear();
 									}
 									catch (std::exception & e)
 									{
-										std::cout << std::setw(4) << i << " > " << std::flush;
-										std::cout << e.what() << std::endl;
+										_debugMsgI(i, e.what());
 										ResponseGenerator	responseObject(e.what());
 
 										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 										_perConnArr[i]->setTimeStarted(time(NULL));
-										std::cout << "reset starting time on " << i << std::endl;
+										_debugMsgI(i, "reset starting time");
 
-										std::cout << std::setw(4) << i << " > " << std::flush;
-										std::cout << "sent:" << std::endl;
+										_debugMsgI(i, "sent:");
 										std::cout << responseObject.getText() << std::flush;
 										_localRecvBuffers[i].clear();
 									}
@@ -397,79 +364,58 @@ void	Server::run(void)
 							else
 							{
 								// ok, it's not a head, there's nothing to read, and we're just there. close if needed.
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Is that some sort of a joke?" << std::endl;
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "No double-endline, AND the buff isn't zero... But nothing to read." << std::endl;
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Timeout-checking..." << std::endl;
+								_debugMsgI(i, "Is that some sort of a joke?");
+								_debugMsgI(i, "No double-endline, AND the buff isn't zero... But nothing to read.");
+								_debugMsgI(i, "Timeout-checking...");
 								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									std::cout << "       yup, close it." << std::endl;
-									close(socks[i].fd);
-									socks[i].fd = -1;
-									_compressTheArr = true;
-									delete  _perConnArr[i];
-									_perConnArr[i] = NULL;
+									_purgeOneConnection(i, &(socks[i].fd));
 								}
 							}
 						}
 						else
 						{
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "Is that some sort of a joke?" << std::endl;
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "Nothing in local buf, the read is 0, how tf did we even get polled????" << std::endl;
-							close(socks[i].fd);
-							socks[i].fd = -1;
-							_compressTheArr = true;
-							delete  _perConnArr[i];
-							_perConnArr[i] = NULL;
+							_debugMsgI(i, "Is that some sort of a joke?");
+							_debugMsgI(i, "Nothing in local buf, the read is 0, how tf did we even get polled????");
+							_purgeOneConnection(i, &(socks[i].fd));
 						}
 					}
 					else if (_retCode > 0)
 					{
 						// every successful recv we reset the timer
 						_perConnArr[i]->setTimeStarted(time(NULL));
-						std::cout << "reset starting time on " << i << std::endl;
+						_debugMsgI(i, "reset starting time");
 						// TODO: bare CR to SP replace
 						// (?)
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << RBUF_SIZE << "." << std::endl;
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "received:" << std::endl;
+						_debugMsgI(i, "received:");
 						buf[_retCode] = 0;
 						std::cout << buf << std::endl;
 						_localRecvBuffers[i] += std::string(buf);
 
-						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Checking for a double line-break (any combo of LF and CRLF)" << std::endl;
+						_debugMsgI(i, "Checking for a double line-break (any combo of LF and CRLF)");
 						if (_perConnArr[i]->getNeedsBody())
 						{
 							if (_localRecvBuffers[i].size() > _perConnArr[i]->getContLen())
 							{
 								_perConnArr[i]->setNeedsBody(false);
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Content size is too big, sending a 400" << std::endl;
+								_debugMsgI(i, "Content size is too big, sending a 400");
 								ResponseGenerator	responseObject("400 Bad Request");
 
 								send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 								_perConnArr[i]->setTimeStarted(time(NULL));
-								std::cout << "reset starting time on " << i << std::endl;
+								_debugMsgI(i, "reset starting time");
 
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "sent:" << std::endl;
+								_debugMsgI(i, "sent:");
 								std::cout << responseObject.getText() << std::flush;
 								_localRecvBuffers[i].clear();
 								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									_localRecvBuffers[i].clear();
-									close(socks[i].fd);
-									socks[i].fd = -1;
-									delete _perConnArr[i];
-									_perConnArr[i] = NULL;
-									_compressTheArr = true;
+									_purgeOneConnection(i, &(socks[i].fd));
 								}
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
@@ -484,33 +430,29 @@ void	Server::run(void)
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 									_perConnArr[i]->setTimeStarted(time(NULL));
-									std::cout << "reset starting time on " << i << std::endl;
+									_debugMsgI(i, "reset starting time");
 
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << "sent:" << std::endl;
+									_debugMsgI(i, "sent:");
 									std::cout << responseObject.getText() << std::flush;
 									_localRecvBuffers[i].clear();
 								}
 								catch (std::exception & e)
 								{
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << e.what() << std::endl;
+									_debugMsgI(i, e.what());
 									ResponseGenerator	responseObject(e.what());
 
 									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
 									_perConnArr[i]->setTimeStarted(time(NULL));
-									std::cout << "reset starting time on " << i << std::endl;
+									_debugMsgI(i, "reset starting time");
 
-									std::cout << std::setw(4) << i << " > " << std::flush;
-									std::cout << "sent:" << std::endl;
+									_debugMsgI(i, "sent:");
 									std::cout << responseObject.getText() << std::flush;
 									_localRecvBuffers[i].clear();
 								}
 							}
 							else
 							{
-								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "Content smaller than expected... continue reading thru the next cycle!!!" << std::endl;
+								_debugMsgI(i, "Content smaller than expected... continue reading thru the next cycle!!!");
 							}
 						}
 						else if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
@@ -522,8 +464,7 @@ void	Server::run(void)
 						}
 						else
 						{
-							std::cout << std::setw(4) << i << " > " << std::flush;
-							std::cout << "Continue reading thru the next cycle!!!" << std::endl;
+							_debugMsgI(i, "Continue reading thru the next cycle!!!");
 						}
 					}
 				}

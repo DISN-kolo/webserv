@@ -17,6 +17,10 @@
 # include <cstdlib>
 # include <cstring>
 # include <csignal>
+/*
+	std::cout << std::setw(4) << i << " > " << std::flush;
+	std::cout << msg << std::endl;
+	*/
 
 class Server
 {
@@ -25,10 +29,16 @@ private:
 	Server &operator=(const Server & obj);
 
 	void	_onHeadLocated(int i, int *fdp);
+	void	_eraseDoubleNlInLocalRecvBuffer(int i);
+	void	_purgeOneConnection(int i, int *fdp);
+
+	void	_debugMsgI(int i, std::string msg);
+	void	_debugMsgTimeI(int i, time_t curTime);
 
 	ServerConfig		*_config;
 
-	// internal variables used for the run function
+
+	// internal variables used for the run function and its subfunctions
 	int							_listenSock;
 	std::vector<int>			_listenSocks;
 	std::vector<std::string>	_localRecvBuffers;
@@ -42,6 +52,10 @@ private:
 	int							_newConnect;
 	bool						_compressTheArr;
 	int							_retCode;
+
+	// more specific http parsing helper vars
+	size_t						_nlnl;
+	std::vector<std::string>	_nls;
 public:
 	Server();
 	void	run(void);

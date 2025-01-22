@@ -1,5 +1,4 @@
 #include "../inc/RequestHeadParser.hpp"
-#
 
 RequestHeadParser::RequestHeadParser()
 {
