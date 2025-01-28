@@ -40,12 +40,14 @@ private:
 	int	_rbufSize;
 	int	_sbufSize;
 	int	_blogSize;
+	int	_connsAmt;
 
 
 	// internal variables used for the run function and its subfunctions
 	int							_listenSock;
 	std::vector<int>			_listenSocks;
 	std::vector<std::string>	_localRecvBuffers;
+	std::string					_localSendString;
 	std::vector<Connect * >		_perConnArr;
 	int							_reuseAddressValue;
 	int 						_timeout;

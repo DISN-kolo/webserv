@@ -16,26 +16,34 @@ private:
 	Connect(const Connect & obj);
 	Connect &operator=(const Connect & obj);
 
-	bool	_needsBody;
-	size_t	_contLen;
-	bool	_keepAlive;
-	time_t	_timeStarted;
-	time_t	_kaTimeout;
+	bool		_needsBody;
+	size_t		_contLen;
+	bool		_keepAlive;
+	time_t		_timeStarted;
+	time_t		_kaTimeout;
+	std::string	_sendStr;
+	bool		_stillResponding;
 public:
 	Connect();
 	~Connect();
 
-	bool	getNeedsBody(void) const;
-	size_t	getContLen(void) const;
-	bool	getKeepAlive(void) const;
-	time_t	getTimeStarted(void) const;
-	time_t	getKaTimeout(void) const;
+	bool		getNeedsBody(void) const;
+	size_t		getContLen(void) const;
+	bool		getKeepAlive(void) const;
+	time_t		getTimeStarted(void) const;
+	time_t		getKaTimeout(void) const;
+	std::string	getSendStr(void) const;
+	bool		getStillResponding(void) const;
 
-	void	setNeedsBody(bool v);
-	void	setContLen(size_t v);
-	void	setKeepAlive(bool v);
-	void	setTimeStarted(time_t v);
-	void	setKaTimeout(time_t v);
+	void		setNeedsBody(bool v);
+	void		setContLen(size_t v);
+	void		setKeepAlive(bool v);
+	void		setTimeStarted(time_t v);
+	void		setKaTimeout(time_t v);
+	void		setSendStr(std::string v);
+	void		setStillResponding(bool v);
+
+	void		eraseSendStr(size_t pos, size_t len);
 } ;
 
 #endif

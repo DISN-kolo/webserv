@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5), _sendStr(""), _stillResponding(false)
 {
 }
 
@@ -10,6 +10,10 @@ Connect &Connect::operator=(const Connect & obj)
 	_needsBody = obj.getNeedsBody();
 	_contLen = obj.getContLen();
 	_keepAlive = obj.getKeepAlive();
+	_timeStarted = obj.getTimeStarted();
+	_kaTimeout = obj.getKaTimeout();
+	_sendStr = obj.getSendStr();
+	_stillResponding = obj.getStillResponding();
 	return (*this);
 }
 
@@ -47,6 +51,16 @@ time_t	Connect::getKaTimeout(void) const
 	return (_kaTimeout);
 }
 
+std::string	Connect::getSendStr(void) const
+{
+	return (_sendStr);
+}
+
+bool	Connect::getStillResponding(void) const
+{
+	return (_stillResponding);
+}
+
 // v for value lol
 void	Connect::setNeedsBody(bool v)
 {
@@ -71,4 +85,19 @@ void	Connect::setTimeStarted(time_t v)
 void	Connect::setKaTimeout(time_t v)
 {
 	_kaTimeout = v;
+}
+
+void	Connect::setSendStr(std::string v)
+{
+	_sendStr = v;
+}
+
+void	Connect::setStillResponding(bool v)
+{
+	_stillResponding = v;
+}
+
+void	Connect::eraseSendStr(size_t pos, size_t len)
+{
+	_sendStr.erase(pos, len);
 }
