@@ -37,6 +37,7 @@ void	Server::_debugMsgTimeI(int i, time_t curTime)
 	std::cout << "time started: " << _perConnArr[i]->getTimeStarted() << ", diff with now: " << curTime - _perConnArr[i]->getTimeStarted() << std::endl;
 }
 
+
 void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
 {
 	for (int nli = 0; nli < 4; nli++)
@@ -52,6 +53,8 @@ void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
 
 void	Server::_purgeOneConnection(int i, int *fdp)
 {
+	// if we're purging the connection, we won't need the buffer, right?
+	_localRecvBuffers[i].clear();
 	close(*fdp);
 	*fdp = -1;
 	delete _perConnArr[i];
@@ -59,7 +62,50 @@ void	Server::_purgeOneConnection(int i, int *fdp)
 	_compressTheArr = true;
 }
 
-void	Server::_onHeadLocated(int i, int *fdp)
+void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool clearLRB, bool purge)
+{
+	if (_sbufSize < rO->getSize())
+	{
+		_localSendString = rO->getText().substr(0, _sbufSize);
+		send(sock->fd, _localSendString.c_str(), _sbufSize, 0);
+
+		sock->events == POLLOUT;
+		_perConnArr[i].setSendStr(rO->getText());
+		_perConnArr[i].eraseSendStr(0, _sbufSize);
+		_perConnArr[i].setStillResponding = true;
+
+		_debugMsgI(i, "all the response:");
+		std::cout << rO->getText() << std::flush;
+		_debugMsgI(i, "the chunk that was sent:");
+		std::cout << _localSendString << std::flush;
+	}
+	else
+	{
+		send(sock->fd, rO->getText().c_str(), rO->getSize(), 0);
+		_perConnArr[i].setStillResponding = false;
+		_debugMsgI(i, "sent in one go:");
+		std::cout << rO->getText() << std::flush;
+	}
+	_perConnArr[i]->setTimeStarted(time(NULL));
+	_debugMsgI(i, "reset starting time");
+
+	if (clearLRB)
+	{
+		_localRecvBuffers[i].clear();
+	}
+
+	if (purgeC)
+	{
+		if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
+				&& (!_perConnArr[i].getStillResponding()))
+		{
+			// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
+			_purgeOneConnection(i, &(sock->fd));
+		}
+	}
+}
+
+void	Server::_onHeadLocated(int i, pollfd *sock)
 {
 	_debugMsgI(i, "Head located. Stop reading for a moment");
 	_debugMsgI(i, "Total msg:");
@@ -97,12 +143,8 @@ void	Server::_onHeadLocated(int i, int *fdp)
 			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(200);
 
-			send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
-			_perConnArr[i]->setTimeStarted(time(NULL));
-			std::cout << "reset starting time on " << i << std::endl;
+			_firstTimeSender(&responseObject, sock, i, false, true);
 
-			_debugMsgI(i, "sent:");
-			std::cout << responseObject.getText() << std::flush;
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
 	}
@@ -112,20 +154,13 @@ void	Server::_onHeadLocated(int i, int *fdp)
 		_debugMsgI(i, e.what());
 		ResponseGenerator	responseObject(e.what());
 
-		send(*fdp, responseObject.getText().c_str(), responseObject.getSize(), 0);
-		_perConnArr[i]->setTimeStarted(time(NULL));
-		std::cout << "reset starting time on " << i << std::endl;
-
-		_debugMsgI(i, "sent:");
-		std::cout << responseObject.getText() << std::flush;
-		_localRecvBuffers[i].clear();
+		_firstTimeSender(&responseObject, sock, i, true, false);
 	}
 	if (!_perConnArr[i]->getKeepAlive())
 	{
 		if (!_perConnArr[i]->getNeedsBody())
 		{
-			_localRecvBuffers[i].clear();
-			_purgeOneConnection(i, fdp);
+			_purgeOneConnection(i, &(sock->fd));
 		}
 	}
 }
@@ -205,6 +240,7 @@ void	Server::run(void)
 	time_t	curTime;
 	while (_running)
 	{
+		// this would be a all files N, see a bit below XXX
 		_retCode = poll(socks, _socksN, _timeout);
 		curTime = time(NULL);
 		if (_retCode < 0)
@@ -213,6 +249,8 @@ void	Server::run(void)
 		}
 		else if (_retCode == 0)
 		{
+			// XXX all of these checks and fors should prolly wind up until the actual socks number, and since we're gonna
+			// do the usual files in the poll as well, we should be careful of what we consider to be "_sockN"
 			for (int i = _lstnN; i < _socksN; i++)
 			{
 				if (_perConnArr[i] != NULL)
@@ -315,37 +353,7 @@ void	Server::run(void)
 									_debugMsgI(i, "Content size is too big, sending a 400");
 									ResponseGenerator	responseObject("400 Bad Request");
 
-									if (_sbufSize < responseObject.getSize())
-									{
-										_localSendString = responseObject.getText().substr(0, _sbufSize);
-										send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
-
-										socks[i].events == POLLOUT;
-										_perConnArr[i].setSendStr(responseObject.getText());
-										_perConnArr[i].eraseSendStr(0, _sbufSize);
-										_perConnArr[i].setStillResponding = true;
-
-										_debugMsgI(i, "all the response:");
-										std::cout << responseObject.getText() << std::flush;
-										_debugMsgI(i, "the chunk that was sent:");
-										std::cout << _localSendString << std::flush;
-									}
-									else
-									{
-										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-										_perConnArr[i].setStillResponding = false;
-										_debugMsgI(i, "sent in one go:");
-										std::cout << responseObject.getText() << std::flush;
-									}
-									_perConnArr[i]->setTimeStarted(time(NULL));
-									_debugMsgI(i, "reset starting time");
-
-									_localRecvBuffers[i].clear();
-									if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
-											&& (!_perConnArr[i].getStillResponding()))
-									{
-										_purgeOneConnection(i, &(socks[i].fd));
-									}
+									_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
 								}
 								else
 								{
@@ -357,63 +365,14 @@ void	Server::run(void)
 //										someMythicalStringThatWillHoldTheBodyForUseByServer = _localRecvBuffers[i].substr(0, _perConnArr[i]->getContLen());
 										ResponseGenerator	responseObject(200);
 
-										if (_sbufSize < responseObject.getSize())
-										{
-											_localSendString = responseObject.getText().substr(0, _sbufSize);
-											send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
-
-											socks[i].events == POLLOUT;
-											_perConnArr[i].setSendStr(responseObject.getText());
-											_perConnArr[i].eraseSendStr(0, _sbufSize);
-											_perConnArr[i].setStillResponding = true;
-
-											_debugMsgI(i, "all the response:");
-											std::cout << responseObject.getText() << std::flush;
-											_debugMsgI(i, "the chunk that was sent:");
-											std::cout << _localSendString << std::flush;
-										}
-										else
-										{
-											send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-											_perConnArr[i].setStillResponding = false;
-											_debugMsgI(i, "sent in one go:");
-											std::cout << responseObject.getText() << std::flush;
-										}
-										_perConnArr[i]->setTimeStarted(time(NULL));
-										_debugMsgI(i, "reset starting time");
-
-										_localRecvBuffers[i].clear();
+										_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
 									}
 									catch (std::exception & e)
 									{
 										_debugMsgI(i, e.what());
 										ResponseGenerator	responseObject(e.what());
-										if (_sbufSize < responseObject.getSize())
-										{
-											_localSendString = responseObject.getText().substr(0, _sbufSize);
-											send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
 
-											socks[i].events == POLLOUT;
-											_perConnArr[i].setSendStr(responseObject.getText());
-											_perConnArr[i].eraseSendStr(0, _sbufSize);
-											_perConnArr[i].setStillResponding = true;
-
-											_debugMsgI(i, "all the response:");
-											std::cout << responseObject.getText() << std::flush;
-											_debugMsgI(i, "the chunk that was sent:");
-											std::cout << _localSendString << std::flush;
-										}
-										else
-										{
-											send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-											_perConnArr[i].setStillResponding = false;
-											_debugMsgI(i, "sent in one go:");
-											std::cout << responseObject.getText() << std::flush;
-										}
-										_perConnArr[i]->setTimeStarted(time(NULL));
-										_debugMsgI(i, "reset starting time");
-
-										_localRecvBuffers[i].clear();
+										_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
 									}
 								}
 							} /* okay, it didn't ask for a body... at least yet. maybe it's a head? */
@@ -442,6 +401,7 @@ void	Server::run(void)
 						{
 							_debugMsgI(i, "Is that some sort of a joke?");
 							_debugMsgI(i, "Nothing in local buf, the read is 0, how tf did we even get polled????");
+							_localRecvBuffers[i].clear();
 							_purgeOneConnection(i, &(socks[i].fd));
 						}
 					}
@@ -468,37 +428,7 @@ void	Server::run(void)
 								_perConnArr[i]->setNeedsBody(false);
 								_debugMsgI(i, "Content size is too big, sending a 400");
 								ResponseGenerator	responseObject("400 Bad Request");
-								if (_sbufSize < responseObject.getSize())
-								{
-									_localSendString = responseObject.getText().substr(0, _sbufSize);
-									send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
-
-									socks[i].events == POLLOUT;
-									_perConnArr[i].setSendStr(responseObject.getText());
-									_perConnArr[i].eraseSendStr(0, _sbufSize);
-									_perConnArr[i].setStillResponding = true;
-
-									_debugMsgI(i, "all the response:");
-									std::cout << responseObject.getText() << std::flush;
-									_debugMsgI(i, "the chunk that was sent:");
-									std::cout << _localSendString << std::flush;
-								}
-								else
-								{
-									send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-									_perConnArr[i].setStillResponding = false;
-									_debugMsgI(i, "sent in one go:");
-									std::cout << responseObject.getText() << std::flush;
-								}
-								_perConnArr[i]->setTimeStarted(time(NULL));
-								_debugMsgI(i, "reset starting time");
-
-								_localRecvBuffers[i].clear();
-								if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
-										&& (!_perConnArr[i].getStillResponding()))
-								{
-									_purgeOneConnection(i, &(socks[i].fd));
-								}
+								_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
@@ -509,65 +439,13 @@ void	Server::run(void)
 								{
 									// the try catch is for having a normal response generator, which will be able to throw errors like 502
 									ResponseGenerator	responseObject(200);
-
-									if (_sbufSize < responseObject.getSize())
-									{
-										_localSendString = responseObject.getText().substr(0, _sbufSize);
-										send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
-
-										socks[i].events == POLLOUT;
-										_perConnArr[i].setSendStr(responseObject.getText());
-										_perConnArr[i].eraseSendStr(0, _sbufSize);
-										_perConnArr[i].setStillResponding = true;
-
-										_debugMsgI(i, "all the response:");
-										std::cout << responseObject.getText() << std::flush;
-										_debugMsgI(i, "the chunk that was sent:");
-										std::cout << _localSendString << std::flush;
-									}
-									else
-									{
-										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-										_perConnArr[i].setStillResponding = false;
-										_debugMsgI(i, "sent in one go:");
-										std::cout << responseObject.getText() << std::flush;
-									}
-									_perConnArr[i]->setTimeStarted(time(NULL));
-									_debugMsgI(i, "reset starting time");
-
-									_localRecvBuffers[i].clear();
+									_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
 								}
 								catch (std::exception & e)
 								{
 									_debugMsgI(i, e.what());
 									ResponseGenerator	responseObject(e.what());
-
-									if (_sbufSize < responseObject.getSize())
-									{
-										_localSendString = responseObject.getText().substr(0, _sbufSize);
-										send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
-
-										socks[i].events == POLLOUT;
-										_perConnArr[i].setSendStr(responseObject.getText());
-										_perConnArr[i].eraseSendStr(0, _sbufSize);
-										_perConnArr[i].setStillResponding = true;
-
-										_debugMsgI(i, "all the response:");
-										std::cout << responseObject.getText() << std::flush;
-										_debugMsgI(i, "the chunk that was sent:");
-										std::cout << _localSendString << std::flush;
-									}
-									else
-									{
-										send(socks[i].fd, responseObject.getText().c_str(), responseObject.getSize(), 0);
-										_perConnArr[i].setStillResponding = false;
-										_debugMsgI(i, "sent in one go:");
-										std::cout << responseObject.getText() << std::flush;
-									}
-									_perConnArr[i]->setTimeStarted(time(NULL));
-									_debugMsgI(i, "reset starting time");
-
-									_localRecvBuffers[i].clear();
+									_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
 								}
 							}
 							else
@@ -634,7 +512,8 @@ void	Server::run(void)
 					i--;
 				}
 			}
-			for (int k = _socksN; k < _blogSize; k++)
+			// XXX must check out the fille bs
+			for (int k = _socksN; k < _connsAmt * 2; k++)
 			{
 				_localRecvBuffers[k].clear();
 				if (_perConnArr[k] != NULL)

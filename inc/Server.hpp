@@ -28,6 +28,7 @@ private:
 	Server(const Server & obj);
 	Server &operator=(const Server & obj);
 
+	void	_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purge);
 	void	_onHeadLocated(int i, int *fdp);
 	void	_eraseDoubleNlInLocalRecvBuffer(int i);
 	void	_purgeOneConnection(int i, int *fdp);
