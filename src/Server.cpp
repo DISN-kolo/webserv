@@ -3,8 +3,9 @@
 Server::Server()
 {
 	_rbufSize = 4096;
-	_sbufSize = 3;
-	//_sbufSize = 4096;
+	_sbufSize = 4096;
+	//_rbufSize = 3200000;
+	//_sbufSize = 3200000;
 	_blogSize = 4096;
 	_connsAmt = 4096;
 	_config = new ServerConfig();
@@ -78,14 +79,14 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool c
 		_debugMsgI(i, "all the response:");
 		std::cout << rO->getText() << std::flush;
 		_debugMsgI(i, "the chunk that was sent:");
-		std::cout << _localSendString << std::flush;
+		std::cout << _localSendString << std::endl;
 	}
 	else
 	{
 		send(sock->fd, rO->getText().c_str(), rO->getSize(), 0);
 		_perConnArr[i]->setStillResponding(false);
 		_debugMsgI(i, "sent in one go:");
-		std::cout << rO->getText() << std::flush;
+		std::cout << rO->getText() << std::endl;
 		sock->events = POLLIN;
 	}
 	_perConnArr[i]->setTimeStarted(time(NULL));
@@ -103,6 +104,7 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool c
 		{
 			// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
 			_purgeOneConnection(i, &(sock->fd));
+			_debugMsgI(i, "connection purged.");
 		}
 	}
 }
@@ -250,7 +252,8 @@ void	Server::run(void)
 			{
 				if (_perConnArr[i] != NULL)
 				{
-					if (_perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
+					if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
+							&& (!_perConnArr[i]->getStillResponding()))
 					{
 						_localRecvBuffers[i].clear();
 						_purgeOneConnection(i, &(socks[i].fd));
@@ -270,7 +273,8 @@ void	Server::run(void)
 			if (_perConnArr[i] != NULL)
 			{
 				_debugMsgTimeI(i, curTime);
-				if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
+				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
+						&& (!_perConnArr[i]->getStillResponding()))
 				{
 					_localRecvBuffers[i].clear();
 					_purgeOneConnection(i, &(socks[i].fd));
@@ -317,8 +321,7 @@ void	Server::run(void)
 				else
 				{
 //					std::cout << "Descriptior " << socks[i].fd << " at pos " << i << " readable" << std::endl;
-					for (int j = 0; j < _rbufSize + 1; j++)
-						buf[j] = 0;
+					std::memset(buf, 0, sizeof (buf));
 					_retCode = recv(socks[i].fd, buf, _rbufSize, 0);
 					if (_retCode < 0)
 					{
@@ -472,21 +475,29 @@ void	Server::run(void)
 					_perConnArr[i]->eraseSendStr(0, _sbufSize);
 
 					_debugMsgI(i, "the chunk that was sent:");
-					std::cout << _localSendString << std::flush;
+					std::cout << _localSendString << std::endl;
 				}
 				else
 				{
 					send(socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
 					_perConnArr[i]->setStillResponding(false);
 					_debugMsgI(i, "sent in one go or remaints:");
-					std::cout << _perConnArr[i]->getSendStr() << std::flush;
+					std::cout << _perConnArr[i]->getSendStr() << std::endl;
 					socks[i].events = POLLIN;
 				}
 
 				_perConnArr[i]->setTimeStarted(time(NULL));
 				_debugMsgI(i, "reset starting time");
-				// close/wipe check? TODO
-				// TODO wait, also, set the poll enum to pollin again
+
+				// something to ponder  XXX
+//				_localRecvBuffers[i].clear();
+				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
+						&& (!_perConnArr[i]->getStillResponding()))
+				{
+					// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
+					_purgeOneConnection(i, &(socks[i].fd));
+					_debugMsgI(i, "connection purged.");
+				}
 			} /* else if POLLOUT */
 		} /* for to iterate thru socks upon poll's return */
 		if (_compressTheArr)
