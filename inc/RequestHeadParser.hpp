@@ -30,6 +30,7 @@ private:
 	size_t		_contLen;
 	bool		_keepAlive;
 	time_t		_kaTimeout;
+	std::string	_pathDeobfuscator(void) const;
 public:
 	RequestHeadParser(std::string r);
 	~RequestHeadParser();

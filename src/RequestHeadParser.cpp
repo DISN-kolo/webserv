@@ -15,6 +15,31 @@ RequestHeadParser &RequestHeadParser::operator=(const RequestHeadParser & obj)
 	return (*this);
 }
 
+// what a name lol.
+// resolves the %XX stuff into ascii
+// resolves the ../../../../.. situations into presentable paths (can't go above
+// the server's "/"
+// adds the <location-thing-path>/ to the front
+std::string	RequestHeadParser::_pathDeobfuscator(void) const
+{
+	std::string			allHexes = "0123456789abcdefABCDEF";
+	std::ostringstream	oss;
+	size_t				i = 0;
+	// convert the %XX
+	while (i < _rTarget.size())
+	{
+		if (_rTarget[i] != '%' || i > _rTarget.size() - 3
+			|| allHexes.find(_rTarget[i + 1]) == std::string::npos
+			|| allHexes.find(_rTarget[i + 2]) == std::string::npos 
+			|| // XXX must add moar rulz. see: https://datatracker.ietf.org/doc/html/rfc2396
+			   // XXX STOPPED HERE XXX
+		{
+			oss << _rTarget[i];
+		}
+
+	}
+}
+
 // lol idk if that's allowed
 #include <algorithm>
 RequestHeadParser::RequestHeadParser(std::string r)

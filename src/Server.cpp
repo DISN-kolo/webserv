@@ -39,7 +39,6 @@ void	Server::_debugMsgTimeI(int i, time_t curTime)
 	std::cout << "time started: " << _perConnArr[i]->getTimeStarted() << ", diff with now: " << curTime - _perConnArr[i]->getTimeStarted() << std::endl;
 }
 
-
 void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
 {
 	for (int nli = 0; nli < 4; nli++)
@@ -55,7 +54,6 @@ void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
 
 void	Server::_purgeOneConnection(int i, int *fdp)
 {
-	// if we're purging the connection, we won't need the buffer, right?
 	_localRecvBuffers[i].clear();
 	close(*fdp);
 	*fdp = -1;
