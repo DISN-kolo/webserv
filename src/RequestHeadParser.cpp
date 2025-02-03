@@ -26,8 +26,13 @@ char	RequestHeadParser::_hexToAscii(size_t i) const
 		found = bigHex.find(_rTarget[i + 1]);
 	}
 	char	result = found * 16;
-	// XXX dinner time
-	return (_rTarget[i + 1] * 16 + _rTarget[i + 2]);
+	found = smallHex.find(_rTarget[i + 2]);
+	if (found == std::string::npos)
+	{
+		found = bigHex.find(_rTarget[i + 2]);
+	}
+	result += found;
+	return (result);
 }
 
 // what a name lol.
