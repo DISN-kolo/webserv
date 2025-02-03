@@ -22,13 +22,18 @@ private:
 	std::string	_getContentType(void);
 
 	std::string	_text;
+	off_t		_fsize;
+	int			_fd;
+	bool		_hasFile;
 public:
 //	ResponseGenerator(/*some parsed object thing here*/);
 	ResponseGenerator(int code);
 	ResponseGenerator(const char * ewhat);
+	ResponseGenerator(const RequestHeadParser & req);
 	~ResponseGenerator();
 
 	std::string	getText(void) const;
 	size_t		getSize(void) const;
+	off_t		getFSize(void) const;
 } ;
 #endif

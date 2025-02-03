@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5), _sendStr(""), _stillResponding(false)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5), _sendStr(""), _stillResponding(false), _hasAFile(false), _sendingFile(false)
 {
 }
 
@@ -14,6 +14,8 @@ Connect &Connect::operator=(const Connect & obj)
 	_kaTimeout = obj.getKaTimeout();
 	_sendStr = obj.getSendStr();
 	_stillResponding = obj.getStillResponding();
+	_hasAFile = obj.getHasAFile();
+	_sendingFile = obj.getSendingFile();
 	return (*this);
 }
 
@@ -61,6 +63,16 @@ bool	Connect::getStillResponding(void) const
 	return (_stillResponding);
 }
 
+bool	Connect::getHasAFile(void) const
+{
+	return (_hasAFile);
+}
+
+bool	Connect::getSendingFile(void) const
+{
+	return (_sendingFile);
+}
+
 // v for value lol
 void	Connect::setNeedsBody(bool v)
 {
@@ -95,6 +107,16 @@ void	Connect::setSendStr(std::string v)
 void	Connect::setStillResponding(bool v)
 {
 	_stillResponding = v;
+}
+
+void	Connect::setHasAFile(bool v)
+{
+	_hasAFile = v;
+}
+
+void	Connect::setSendingFile(bool v)
+{
+	_sendingFile = v;
 }
 
 void	Connect::eraseSendStr(size_t pos, size_t len)

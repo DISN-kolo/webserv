@@ -4,6 +4,7 @@ ResponseGenerator::ResponseGenerator()
 {
 }
 
+// more or less a placeholder.
 ResponseGenerator::ResponseGenerator(int code)
 {
 	std::stringstream	ss;
@@ -34,6 +35,37 @@ ResponseGenerator::ResponseGenerator(const char * ewhat)
 	// no vvvv ? FIXME remove it?
 	ss << CRLF;
 	_text = ss.str();
+}
+
+#include <sys/stat.h>
+ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
+{
+	// let's say that the location directive is already resolved somewhere prior. here,
+	if (req.getMethod() == "GET")
+	{
+		_fd = open(req.getRTarget(), O_RDONLY);
+		if (_fd == -1)
+		{
+			throw internalServerError();
+		}
+
+		struct stat	st;
+		if (stat(req.getRTarget(), &st) == -1)
+		{
+			throw internalServerError();
+		}
+		_fsize = st.st_size;
+		_hasFile = true;
+
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "200 OK" << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Type: " << _getContentType() << CRLF;
+		ss << "Content-Length: " << _fsize << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+	}
 }
 
 ResponseGenerator::ResponseGenerator(const ResponseGenerator & obj)
@@ -82,10 +114,8 @@ std::string	ResponseGenerator::_getStatusMessage(int status)
 	{
 		case 200:
 			return ("OK");
-		case 404:
-			return ("Not Found");
 		default:
-			return ("I'm a teapot");
+			return ("Status code message not implemented.");
 	}
 }
 
@@ -135,5 +165,17 @@ std::string	ResponseGenerator::getText(void) const
 
 size_t	ResponseGenerator::getSize(void) const
 {
-	return (_text.size());
+	if (!_hasFile)
+	{
+		return (_text.size());
+	}
+	else
+	{
+		return (_text.size() + _fsize);
+	}
+}
+
+off_t	ResponseGenerator::getFSize(void) const
+{
+	return (_fsize);
 }

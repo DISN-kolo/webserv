@@ -64,3 +64,8 @@ const char *lengthRequired::what(void) const throw()
 {
 	return ("411 Length Required");
 }
+
+const char *internalServerError::what(void) const throw()
+{
+	return ("500 Internal Server Error");
+}

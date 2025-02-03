@@ -64,6 +64,7 @@ void	Server::_purgeOneConnection(int i, int *fdp)
 
 void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool clearLRB, bool purgeC)
 {
+	// here, an IF for a "are we gonna have a file" TODO
 	if (static_cast<size_t>(_sbufSize) < rO->getSize())
 	{
 		_localSendString = rO->getText().substr(0, _sbufSize);
@@ -130,7 +131,7 @@ void	Server::_onHeadLocated(int i, pollfd *sock)
 			_perConnArr[i]->setContLen(req.getContLen());
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
-		else
+		else if (req.getMethod() == "GET")
 		{
 			// TODO filing notes
 			// if it's not a post and we already have a head, we should just stop --drop and roll--
@@ -142,6 +143,16 @@ void	Server::_onHeadLocated(int i, pollfd *sock)
 			// the fds that got poll'd.
 			// ALSO check out .... file writing! File writing is done via polling, too. No?
 			// ALSO check out .... just sending regular responses might require poll?????? like.... POLLOUT n stuff....... oh my gaaaaaaawddddddddddd
+			_perConnArr[i]->setNeedsBody(false);
+			ResponseGenerator	responseObject(req);
+
+			_firstTimeSender(&responseObject, sock, i, false, true);
+
+			_eraseDoubleNlInLocalRecvBuffer(i);
+		}
+		else
+		{
+			// this is DELETE.... obviously, TODO. not implemented yet at all
 			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(200);
 
@@ -465,6 +476,8 @@ void	Server::run(void)
 			} /* else if POLLIN */
 			else if ((socks[i].revents & POLLOUT) == POLLOUT)
 			{
+				// do a check for file here too TODO
+				// see image in slack
 				if (static_cast<size_t>(_sbufSize) < _perConnArr[i]->getSendStr().size())
 				{
 					_localSendString = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
