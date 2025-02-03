@@ -15,33 +15,109 @@ RequestHeadParser &RequestHeadParser::operator=(const RequestHeadParser & obj)
 	return (*this);
 }
 
+char	RequestHeadParser::_hexToAscii(size_t i) const
+{
+	std::string	smallHex = "0123456789abcdef";
+	std::string	bigHex = "0123456789ABCDEF";
+	size_t		found;
+	found = smallHex.find(_rTarget[i + 1]);
+	if (found == std::string::npos)
+	{
+		found = bigHex.find(_rTarget[i + 1]);
+	}
+	char	result = found * 16;
+	// XXX dinner time
+	return (_rTarget[i + 1] * 16 + _rTarget[i + 2]);
+}
+
 // what a name lol.
 // resolves the %XX stuff into ascii
 // resolves the ../../../../.. situations into presentable paths (can't go above
 // the server's "/"
 // adds the <location-thing-path>/ to the front
-std::string	RequestHeadParser::_pathDeobfuscator(void) const
+void	RequestHeadParser::_pathDeobfuscator(void)
 {
 	std::string			allHexes = "0123456789abcdefABCDEF";
+	// dubious forbiddenness
+//	std::string			forbiddenCharsPrintable = " \"<>\\^`{|}";
+	// doing a 0x00 here woudl probably be weird and un-parseable
+	char				lowestForbiddenChar = 0x01;
+	char				highestForbiddenChar = 0x1F;
+	char				bonusForbiddenChar = 0x7F;
 	std::ostringstream	oss;
 	size_t				i = 0;
+	// check for forbidden symbols in raw uri
+	// maybe a special kind of error for bad uri?
+	for (size_t j = 0; j < _rTarget.size(); j++)
+	{
+		if (_rTarget[j] == bonusForbiddenChar
+			|| (_rTarget[j] <= highestForbiddenChar && _rTarget[j] >= lowestForbiddenChar))
+		{
+			throw badRequest();
+		}
+	}
 	// convert the %XX
 	while (i < _rTarget.size())
 	{
-		if (_rTarget[i] != '%' || i > _rTarget.size() - 3
-			|| allHexes.find(_rTarget[i + 1]) == std::string::npos
-			|| allHexes.find(_rTarget[i + 2]) == std::string::npos 
-			|| // XXX must add moar rulz. see: https://datatracker.ietf.org/doc/html/rfc2396
-			   // XXX STOPPED HERE XXX
+		if (_rTarget[i] != '%')
 		{
 			oss << _rTarget[i];
+			i++;
+			continue ;
 		}
-
+		if (i > _rTarget.size() - 3)
+		{
+			oss << _rTarget[i];
+			i++;
+			continue ;
+		}
+		if (allHexes.find(_rTarget[i + 1]) == std::string::npos
+			|| allHexes.find(_rTarget[i + 2]) == std::string::npos)
+		{
+			oss << _rTarget[i];
+			i++;
+			continue ;
+		}
+		// okay, now we're for sure in a %-parsing scenario
+		oss << _hexToAscii(i);
+		i += 3;
+	}
+	// parse the / shenanigans. divide by chunks, and if "..", shorten. then, unite again.
+	_rTarget = oss.str();
+	std::stringstream			ss(_rTarget);
+	std::string					pathPart;
+	std::vector<std::string>	parsedPath;
+	while (std::getline(ss, pathPart, '/'))
+	{
+		if (pathPart == "" || pathPart == ".")
+		{
+			continue ;
+		}
+		else if (pathPart == "..")
+		{
+			if (!parsedPath.empty())
+			{
+				parsedPath.pop_back();
+			}
+		}
+		else
+		{
+			parsedPath.push_back(pathPart);
+		}
+	}
+	_rTarget.clear();
+	if (parsedPath.empty())
+	{
+		_rTarget = "/";
+		return ;
+	}
+	std::vector<std::string>::iterator	it;
+	for (it = parsedPath.begin(); it != parsedPath.end(); it++)
+	{
+		_rTarget += "/" + *it;
 	}
 }
 
-// lol idk if that's allowed
-#include <algorithm>
 RequestHeadParser::RequestHeadParser(std::string r)
 	:	_r(r)
 {
@@ -134,6 +210,10 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		}
 		wcount++;
 	}
+
+	_pathDeobfuscator();
+	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
+	std::cout << "true rtarget: " << _rTarget << std::endl;
 
 	// amazing, first line parsed.
 	// now, 1. get next line

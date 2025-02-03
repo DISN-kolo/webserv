@@ -4,6 +4,7 @@
 # include <sstream>
 # include <iostream>
 # include <string>
+# include <algorithm>
 
 class RequestHeadParser
 {
@@ -27,10 +28,11 @@ private:
 
 	// since we're gonna parse it anyways to check for the correctness of the field,
 	// why not store it for later use, to avoid parsing it twice.
-	size_t		_contLen;
-	bool		_keepAlive;
-	time_t		_kaTimeout;
-	std::string	_pathDeobfuscator(void) const;
+	size_t	_contLen;
+	bool	_keepAlive;
+	time_t	_kaTimeout;
+	void	_pathDeobfuscator(void);
+	char	_hexToAscii(size_t i) const;
 public:
 	RequestHeadParser(std::string r);
 	~RequestHeadParser();
