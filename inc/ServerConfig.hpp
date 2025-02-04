@@ -3,7 +3,8 @@
 
 # include "webserv.hpp"
 # include "exceptions.hpp"
-#include <fstream>
+# include <fstream>
+# include <sstream>
 
 struct routes {
 	std::vector<std::string>	accMethods;
@@ -25,21 +26,26 @@ struct config {
 
 class ServerConfig
 {
-private:
-	std::vector<struct config>	_config;
-	void						_parseConfig(const std::string &file);
-	bool						_getConfigLine(const std::string &line);
-	std::vector<std::string>	_getConfigValues(const std::string &str);
-	std::string					_getConfigValue(const std::string &str);
+	private:
+		std::vector<struct config>	_config;
+		void						_parseConfig(const std::string &file);
+		void						_getConfigLine(const std::string &line, int &brackets);
+		std::vector<std::string>	_getConfigValues(const std::string &str);
+		std::string					_getConfigValue(const std::string &str);
+		void						_validateConfigValues(const std::string &key, const std::vector<std::string> values, int &brackets);
 
+		bool						_validateChildValue(const std::vector<std::string> values);
+		bool						_validateNbr(const std::string &value);
 
-public:
-	ServerConfig();
-	ServerConfig(const std::string &file);
-	ServerConfig(const ServerConfig & obj);
-	ServerConfig &operator=(const ServerConfig & obj);
-	~ServerConfig();
-	std::vector<int>getPorts();
+		int							_stoi(const std::string &str);
+
+	public:
+		ServerConfig();
+		ServerConfig(const std::string &file);
+		ServerConfig(const ServerConfig & obj);
+		ServerConfig &operator=(const ServerConfig & obj);
+		~ServerConfig();
+		std::vector<int>getPorts();
 } ;
 
 #endif

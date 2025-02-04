@@ -2,7 +2,7 @@
 
 ServerConfig::ServerConfig()
 {
-	_parseConfig("default.conf");
+	_parseConfig("config/default.conf");
 }
 
 ServerConfig::ServerConfig(const std::string &file)
@@ -33,24 +33,26 @@ std::vector<int>ServerConfig::getPorts()
 
 void	ServerConfig::_parseConfig(const std::string &file)
 {
-	std::ifstream	configFile(("config/" + file).c_str());
+	std::ifstream	configFile((file).c_str());
 	std::string		line;
+	int				brackets = 0;
 	
 	if (!configFile.is_open())
 		throw configFileException();
+	_config.push_back(config());
 	while (std::getline(configFile, line))
 	{
 		try {
-			_getConfigLine(line);
+			_getConfigLine(line, brackets);
 		} catch (std::exception &err)
 		{
-			std::cout << "ERROR LINE!" << std::endl;
+			std::cout << err.what() << std::endl;
 		}
 	}
 	configFile.close();
 }
 
-bool	ServerConfig::_getConfigLine(const std::string &str)
+void	ServerConfig::_getConfigLine(const std::string &str, int &brackets)
 {
 	std::vector<std::string>	values;
 	std::string					key;
@@ -59,17 +61,25 @@ bool	ServerConfig::_getConfigLine(const std::string &str)
 	while (str[i] && std::isspace(str[i]))
 		i++;
 	if (str[i] == '}')
-		return true; // End server / location;
+	{
+		if (brackets > 0)
+			brackets--;
+		else
+		{
+			throw configFileBracketsException();
+		}
+		std::cout << brackets << std::endl;
+	}
 	if (!str[i] || str[i] == '#')
-		return false;
+		return ;
 	while (str[i + j] && str[i + j] != ':')
 		j++;
 	if (j == 0)
-		throw configFileException();
+		throw configFileLineException();
 	key = str.substr(i, j);
 	std::cout << "KEY: " << key << " Values: ";
 	values = _getConfigValues(str.substr(i + j + 1));
-	return false;
+	_validateConfigValues(key, values, brackets);
 }
 
 std::vector<std::string> ServerConfig::_getConfigValues(const std::string &str)
@@ -85,13 +95,13 @@ std::vector<std::string> ServerConfig::_getConfigValues(const std::string &str)
 			j++;
 		value = _getConfigValue(str.substr(i, j));
 		if (!value.size())
-			throw configFileException(); // , without value
+			throw configFileLineException();
 		values.push_back(value);
 		std::cout << value << "|";
 		if (str[i + j] == ';' || (values.size() == 1 && values[values.size() - 1] == "{"))
 			break;
 		if (!str[i + j])
-			throw configFileException(); // end of line without ;
+			throw configFileLineException();
 		i += j + 1;
 	}
 	std::cout << std::endl;
@@ -111,4 +121,60 @@ std::string ServerConfig::_getConfigValue(const std::string &str)
 		j++;
 	}
 	return (str.substr(i, j));
+}
+
+void	ServerConfig::_validateConfigValues(const std::string &key, const std::vector<std::string> values, int &brackets)
+{
+	if (key == "server")
+	{
+		if (_validateChildValue(values) && brackets == 0)
+		{
+			_config.push_back(config());
+			_config.back().routes.push_back(routes());
+			brackets++;
+		}
+		else
+			throw configFileLineException();
+	}
+	else if (key == "location")
+	{
+		if (_validateChildValue(values) && brackets == 1)
+		{
+			_config.back().routes.push_back(routes());
+			brackets++;
+		}
+		else
+			throw configFileLineException();
+	}
+	else
+	{
+		if (key == "port")
+		{
+			if (values.size() == 1 && _validateNbr(values[0]))
+				_config.back().port = _stoi(values[0]);
+		}
+	}
+}
+
+bool	ServerConfig::_validateChildValue(const std::vector<std::string> values)
+{
+	return (values.size() == 1 && values[0] == "{");
+}
+
+bool	ServerConfig::_validateNbr(const std::string &value)
+{
+	for (size_t i = 0; i < value.length() - 1; i++)
+	{
+		if (!std::isdigit(value[i]))
+			return false;
+	}
+	return true;
+}
+
+int	ServerConfig::_stoi(const std::string &str)
+{
+	std::stringstream ss(str);
+	int num;
+	ss >> num;
+	return num;
 }

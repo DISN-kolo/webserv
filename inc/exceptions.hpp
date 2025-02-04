@@ -9,6 +9,18 @@ class	configFileException : public std::exception
 		virtual const char	*what(void) const throw();
 };
 
+class	configFileLineException : public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
+class	configFileBracketsException : public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	socketUnopenedError : public std::exception
 {
 	public:
