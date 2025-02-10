@@ -22,11 +22,10 @@ private:
 	std::string	_getContentType(void);
 
 	std::string	_text;
-	off_t		_fsize;
+	off_t		_fSize;
 	int			_fd;
 	bool		_hasFile;
 public:
-//	ResponseGenerator(/*some parsed object thing here*/);
 	ResponseGenerator(int code);
 	ResponseGenerator(const char * ewhat);
 	ResponseGenerator(const RequestHeadParser & req);

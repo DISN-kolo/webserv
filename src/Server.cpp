@@ -86,7 +86,14 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool c
 		_perConnArr[i]->setStillResponding(false);
 		_debugMsgI(i, "sent in one go:");
 		std::cout << rO->getText() << std::endl;
-		sock->events = POLLIN;
+		if (_perConnArr[i]->getHasFile())
+		{
+			_perConnArr[i]->setSendingFile(true);
+		}
+		else
+		{
+			sock->events = POLLIN;
+		}
 	}
 	_perConnArr[i]->setTimeStarted(time(NULL));
 	_debugMsgI(i, "reset starting time");
@@ -99,7 +106,7 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool c
 	if (purgeC)
 	{
 		if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
-				&& (!_perConnArr[i]->getStillResponding()))
+				&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
 		{
 			// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
 			_purgeOneConnection(i, &(sock->fd));
@@ -114,7 +121,6 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 	_debugMsgI(i, "Total msg:");
 	std::cout << _localRecvBuffers[i] << std::flush;
 	// in case RHP fails; keep-alive is the default for http 1.1
-	// TODO responder class
 	try
 	{
 		RequestHeadParser		req(_localRecvBuffers[i]);
@@ -145,11 +151,21 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			// ALSO check out .... just sending regular responses might require poll?????? like.... POLLOUT n stuff....... oh my gaaaaaaawddddddddddd
 			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(req);
-			if (rO->getHasFile())
+			if (responseObject.getHasFile())
 			{
 				_perConnArr[i]->setHasFile(true);
-				for (int j = 
-				_perConnArr[i]->setRelativeFIndex();
+				for (int j = _socksN; j < 2 * _connsAmt; j++)
+				{
+					if (socks[j].fd == -1)
+					{
+						_filesN++;
+						socks[j].fd = responseObject.getFd();
+						socks[j].events = POLLIN;
+						break ;
+					}
+				}
+				_perConnArr[i]->setFd(responseObject.getFd());
+				_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
 			}
 
 			_firstTimeSender(&responseObject, &(socks[i]), i, false, true);
@@ -239,11 +255,13 @@ void	Server::run(void)
 	// _timeout is measured in ms
 	_timeout = 1 * 1000;
 	_socksN = _listenSocks.size();
+	_filesN = _socksN;
 	_lstnN = _socksN;
 	// newconnect's -2 is its init value while -1 indicates a fail
 	_newConnect = -2;
 	_compressTheArr = false;
 	char	buf[_rbufSize + 1];
+	char	fileToReadBuf[_sbufSize + 1];
 	// this will store what we read because we shall be able to read in multiple passes before closing the connection.
 	_localRecvBuffers = std::vector<std::string>(_connsAmt, "");
 
@@ -253,7 +271,7 @@ void	Server::run(void)
 	while (_running)
 	{
 		// this would be a all files N, see a bit below XXX
-		_retCode = poll(socks, _socksN, _timeout);
+		_retCode = poll(socks, _filesN, _timeout);
 		curTime = time(NULL);
 		if (_retCode < 0)
 		{
@@ -357,7 +375,7 @@ void	Server::run(void)
 							if (_perConnArr[i]->getNeedsBody())
 							{
 								std::cout << std::setw(4) << i << " > " << std::flush;
-								std::cout << "_retcode is 0, the local recv buffer is " << _localRecvBuffers[i].size() << " long, we need a body." << std::endl;
+								std::cout << "_retCode is 0, the local recv buffer is " << _localRecvBuffers[i].size() << " long, we need a body." << std::endl;
 								std::cout << std::setw(4) << i << " > " << std::flush;
 								std::cout << "content-length for this one is supposed to be " << _perConnArr[i]->getContLen() << "..." << std::endl;
 								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
@@ -482,25 +500,130 @@ void	Server::run(void)
 			} /* else if POLLIN */
 			else if ((socks[i].revents & POLLOUT) == POLLOUT)
 			{
-				// do a check for file here too TODO
-				// see image in slack
-				if (static_cast<size_t>(_sbufSize) < _perConnArr[i]->getSendStr().size())
+				// regular sends (not first sends)
+				// step 1. are we sending a file rn? no? well, just send the string that's saved in the perconarr[i]
+				if (!_perConnArr[i]->getSendingFile())
 				{
-					_localSendString = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
-					send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+					if (static_cast<size_t>(_sbufSize) < _perConnArr[i]->getSendStr().size())
+					{
+						_localSendString = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
+						send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
 
-					_perConnArr[i]->eraseSendStr(0, _sbufSize);
+						_perConnArr[i]->eraseSendStr(0, _sbufSize);
 
-					_debugMsgI(i, "the chunk that was sent:");
-					std::cout << _localSendString << std::endl;
+						_debugMsgI(i, "the chunk that was sent:");
+						std::cout << _localSendString << std::endl;
+					}
+					else
+					{
+						send(socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
+						_perConnArr[i]->setStillResponding(false);
+						_debugMsgI(i, "sent in one go or remaints:");
+						std::cout << _perConnArr[i]->getSendStr() << std::endl;
+						if (_perConnArr[i]->getHasFile())
+						{
+							_perConnArr[i]->setSendingFile(true);
+						}
+						else
+						{
+							socks[i].events = POLLIN;
+						}
+					}
 				}
+				// oh, we have a file to send? ok. we need to read it, in the same chunk by chunk manner.
 				else
 				{
-					send(socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
-					_perConnArr[i]->setStillResponding(false);
-					_debugMsgI(i, "sent in one go or remaints:");
-					std::cout << _perConnArr[i]->getSendStr() << std::endl;
-					socks[i].events = POLLIN;
+					_tempFdI = -1;
+					for (int j = _socksN; j < _filesN; j++)
+					{
+						if (socks[j].fd == _perConnArr[i]->getFd())
+						{
+							_tempFdI = j;
+							break ;
+						}
+					}
+					// TODO remove or fix if it's actually a problem
+					if (_tempFdI == -1)
+					{
+						_debugMsgI(i, "where. fix your stuff please. fd of file not found within the [_socksN.._filesN) indices of the pollfds array");
+						return ;
+					}
+					// after finding where the file fd is in the poll's list, we check for its revents. irl, it's probably absolutely always ready
+					// but here we have a subject to abide by :P
+					if (((socks[_tempFdI].revents & POLLERR) == POLLERR)
+							|| ((socks[_tempFdI].revents & POLLHUP) == POLLHUP)
+							|| ((socks[_tempFdI].revents & POLLNVAL) == POLLNVAL))
+					{
+						_debugMsgI(i, "while processing the socket,..")
+						_debugMsgI(_tempFdI, "<- its associated file errored.");
+					}
+					else if ((socks[_tempFdI].revents & POLLIN) == POLLIN)
+					{
+						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
+						_retCode = read(socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
+						if (_retCode < 0)
+						{
+							// file reading error. this is weird; we should've caught it upon opening the file,
+							// but maybe we're reading a 2gb file and the admin deleted it while we were in the middle
+							// thus, this needs appropriate handling FIXME
+							_debugMsgI(i, "retcode on file <1. crashing for lols.");
+							return ;
+						}
+						else if (_retCode == 0)
+						{
+							// we somehow had something from poll but showed up with 0 bytes upon actual reading.
+							// mathematically unlikely, as bob page perfectly put it in the hit videogame deus ex from the year 2000.
+							_debugMsgI(i, "ABSOLUTELY done reading from the asked file. close it up.");
+							close(socks[_tempFdI].fd);
+							socks[_tempFdI].fd = -1;
+							_compressTheArr = true;
+
+							_perConnArr[i]->setSendingFile(false);
+							_perConnArr[i]->setStillResponding(false);
+							socks[i].events = POLLIN;
+						}
+						else if (_perConnArr[i]->getRemainingFileSize() == _retCode)
+						{
+							// the amount of file left is exactly the amount that was read. ggs
+							_debugMsgI(i, "the intended way of finishing reading a file reached.");
+							fileToReadBuf[_retCode] = 0;
+							_localSendString = std::string(fileToReadBuf);
+							send(socks[i].fd, _localSendString.c_str(), _retCode, 0);
+
+							// what's the purpose...
+//							_perConnArr[i]->diminishRemainingFileSize(_sbufSize);
+
+							_debugMsgI(i, "the last f-chunk that was sent:");
+							std::cout << _localSendString << std::endl;
+
+							close(socks[_tempFdI].fd);
+							socks[_tempFdI].fd = -1;
+							_compressTheArr = true;
+
+							_perConnArr[i]->setSendingFile(false);
+							_perConnArr[i]->setStillResponding(false);
+							socks[i].events = POLLIN;
+						}
+						else
+						{
+							// the "regular". we need to substract the sbuf size from the counter of remaining filesize and send the chunk.
+							fileToReadBuf[_retCode] = 0;
+							_localSendString = std::string(fileToReadBuf);
+							send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+
+							_perConnArr[i]->diminishRemainingFileSize(_sbufSize);
+
+							_debugMsgI(i, "the f-chunk that was sent:");
+							std::cout << _localSendString << std::endl;
+						}
+					}
+					else
+					{
+						// file not hit by revents. mathematically unlikely.
+						_debugMsgI(i, "file not ready yet");
+						_debugMsgI(_tempFdI, "<- file");
+						continue ;
+					}
 				}
 
 				_perConnArr[i]->setTimeStarted(time(NULL));
@@ -509,7 +632,7 @@ void	Server::run(void)
 				// something to ponder  XXX
 //				_localRecvBuffers[i].clear();
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
-						&& (!_perConnArr[i]->getStillResponding()))
+						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
 				{
 					// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
 					_purgeOneConnection(i, &(socks[i].fd));
@@ -544,6 +667,8 @@ void	Server::run(void)
 			// _filesN corrected = 8 (still!)
 			// AND AND AND we should just have fds in the perconarr. they're already unique..
 			// there'll be no problem in referring to them as is instead of using the fd index stuff.
+			// we could have a fd-index lookup map hmmmmmmm
+			// but that's just for speed purposes. idk
 			_compressTheArr = false;
 			for (int i = _lstnN; i < _socksN; i++)
 			{
@@ -574,12 +699,11 @@ void	Server::run(void)
 						socks[j].events = socks[j + 1].events;
 						socks[j].revents = socks[j + 1].revents;
 					}
-					i--;
+					f--;
 				}
 			}
-			for (int k = _socksN + _filesN; k < 2 * _connsAmt; k++)
+			for (int k = _filesN; k < 2 * _connsAmt; k++)
 			{
-//				std::cout << k << ": " << _perConnArr[k] << std::endl;
 				_localRecvBuffers[k].clear();
 				if (_perConnArr[k] != NULL)
 				{

@@ -25,7 +25,8 @@ private:
 	bool		_stillResponding;
 	bool		_hasFile;
 	bool		_sendingFile;
-	int			_relativeFIndex;
+	int			_fd;
+	off_t		_remainingFileSize;
 public:
 	Connect();
 	~Connect();
@@ -39,7 +40,8 @@ public:
 	bool		getStillResponding(void) const;
 	bool		getHasFile(void) const;
 	bool		getSendingFile(void) const;
-	int			getRelativeFIndex(void) const;
+	int			getFd(void) const;
+	off_t		getRemainingFileSize(void) const;
 
 	void		setNeedsBody(bool v);
 	void		setContLen(size_t v);
@@ -50,9 +52,11 @@ public:
 	void		setStillResponding(bool v);
 	void		setHasFile(bool v);
 	void		setSendingFile(bool v);
-	void		setRelativeFIndex(int v);
+	void		setFd(int v);
+	void		setRemainingFileSize(off_t v);
 
 	void		eraseSendStr(size_t pos, size_t len);
+	off_t		diminishRemainingFileSize(int amt);
 } ;
 
 #endif

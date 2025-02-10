@@ -53,12 +53,14 @@ private:
 	int							_reuseAddressValue;
 	int 						_timeout;
 	int							_socksN;
+	int							_filesN;
 	int							_lstnN;
 	int							_curSize;
 	bool						_running;
 	int							_newConnect;
 	bool						_compressTheArr;
 	int							_retCode;
+	int							_tempFdI;
 
 	// more specific http parsing helper vars
 	size_t						_nlnl;

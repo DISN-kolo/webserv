@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0)
 {
 }
 
@@ -16,6 +16,8 @@ Connect &Connect::operator=(const Connect & obj)
 	_stillResponding = obj.getStillResponding();
 	_hasFile = obj.getHasFile();
 	_sendingFile = obj.getSendingFile();
+	_fd = obj.getFd();
+	_remainingFileSize = obj.getRemainingFileSize();
 	return (*this);
 }
 
@@ -73,9 +75,14 @@ bool	Connect::getSendingFile(void) const
 	return (_sendingFile);
 }
 
-bool	Connect::getRelativeFIndex(void) const
+bool	Connect::getFd(void) const
 {
-	return (_relativeFIndex);
+	return (_fd);
+}
+
+off_t	Connect::getRemainingFileSize(void) const
+{
+	return (_remainingFileSize);
 }
 
 // v for value lol
@@ -124,12 +131,29 @@ void	Connect::setSendingFile(bool v)
 	_sendingFile = v;
 }
 
-void	Connect::setRelativeFIndex(int v)
+void	Connect::setFd(int v)
 {
-	_relativeFIndex = v;
+	_fd = v;
+}
+
+void	Connect::setRemainingFileSize(off_t v)
+{
+	_remainingFileSize = v;
 }
 
 void	Connect::eraseSendStr(size_t pos, size_t len)
 {
 	_sendStr.erase(pos, len);
+}
+
+void	Connect::diminishRemainingFileSize(int amt)
+{
+	if (amt > _remainingFileSize)
+	{
+		_remainingFileSize = 0;
+	}
+	else
+	{
+		_remainingFileSize -= amt;
+	}
 }

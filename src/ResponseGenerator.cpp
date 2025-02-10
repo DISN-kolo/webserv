@@ -54,7 +54,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		{
 			throw internalServerError();
 		}
-		_fsize = st.st_size;
+		_fSize = st.st_size;
 		_hasFile = true;
 
 		std::stringstream	ss;
@@ -62,7 +62,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		ss << "Date: " << _getDate() << CRLF;
 		ss << "Server: " << _getServerName() << CRLF;
 		ss << "Content-Type: " << _getContentType() << CRLF;
-		ss << "Content-Length: " << _fsize << CRLF;
+		ss << "Content-Length: " << _fSize << CRLF;
 		ss << CRLF;
 		_text = ss.str();
 	}
@@ -165,19 +165,20 @@ std::string	ResponseGenerator::getText(void) const
 
 size_t	ResponseGenerator::getSize(void) const
 {
-	if (!_hasFile)
-	{
-		return (_text.size());
-	}
-	else
-	{
-		return (_text.size() + _fsize);
-	}
+	return (_text.size());
+//	if (!_hasFile)
+//	{
+//		return (_text.size());
+//	}
+//	else
+//	{
+//		return (_text.size() + _fSize);
+//	}
 }
 
 off_t	ResponseGenerator::getFSize(void) const
 {
-	return (_fsize);
+	return (_fSize);
 }
 
 int	ResponseGenerator::getFd(void) const
