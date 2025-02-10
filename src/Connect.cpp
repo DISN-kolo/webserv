@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5), _sendStr(""), _stillResponding(false), _hasAFile(false), _sendingFile(false)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(5), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false)
 {
 }
 
@@ -14,7 +14,7 @@ Connect &Connect::operator=(const Connect & obj)
 	_kaTimeout = obj.getKaTimeout();
 	_sendStr = obj.getSendStr();
 	_stillResponding = obj.getStillResponding();
-	_hasAFile = obj.getHasAFile();
+	_hasFile = obj.getHasFile();
 	_sendingFile = obj.getSendingFile();
 	return (*this);
 }
@@ -63,14 +63,19 @@ bool	Connect::getStillResponding(void) const
 	return (_stillResponding);
 }
 
-bool	Connect::getHasAFile(void) const
+bool	Connect::getHasFile(void) const
 {
-	return (_hasAFile);
+	return (_hasFile);
 }
 
 bool	Connect::getSendingFile(void) const
 {
 	return (_sendingFile);
+}
+
+bool	Connect::getRelativeFIndex(void) const
+{
+	return (_relativeFIndex);
 }
 
 // v for value lol
@@ -109,14 +114,19 @@ void	Connect::setStillResponding(bool v)
 	_stillResponding = v;
 }
 
-void	Connect::setHasAFile(bool v)
+void	Connect::setHasFile(bool v)
 {
-	_hasAFile = v;
+	_hasFile = v;
 }
 
 void	Connect::setSendingFile(bool v)
 {
 	_sendingFile = v;
+}
+
+void	Connect::setRelativeFIndex(int v)
+{
+	_relativeFIndex = v;
 }
 
 void	Connect::eraseSendStr(size_t pos, size_t len)

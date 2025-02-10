@@ -35,5 +35,7 @@ public:
 	std::string	getText(void) const;
 	size_t		getSize(void) const;
 	off_t		getFSize(void) const;
+	int			getFd(void) const;
+	bool		getHasFile(void) const;
 } ;
 #endif

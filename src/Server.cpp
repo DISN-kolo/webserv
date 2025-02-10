@@ -64,7 +64,7 @@ void	Server::_purgeOneConnection(int i, int *fdp)
 
 void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool clearLRB, bool purgeC)
 {
-	// here, an IF for a "are we gonna have a file" TODO
+	// in case of has file being true, the size would be just of the head
 	if (static_cast<size_t>(_sbufSize) < rO->getSize())
 	{
 		_localSendString = rO->getText().substr(0, _sbufSize);
@@ -108,7 +108,7 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool c
 	}
 }
 
-void	Server::_onHeadLocated(int i, pollfd *sock)
+void	Server::_onHeadLocated(int i, pollfd *socks)
 {
 	_debugMsgI(i, "Head located. Stop reading for a moment");
 	_debugMsgI(i, "Total msg:");
@@ -145,8 +145,14 @@ void	Server::_onHeadLocated(int i, pollfd *sock)
 			// ALSO check out .... just sending regular responses might require poll?????? like.... POLLOUT n stuff....... oh my gaaaaaaawddddddddddd
 			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(req);
+			if (rO->getHasFile())
+			{
+				_perConnArr[i]->setHasFile(true);
+				for (int j = 
+				_perConnArr[i]->setRelativeFIndex();
+			}
 
-			_firstTimeSender(&responseObject, sock, i, false, true);
+			_firstTimeSender(&responseObject, &(socks[i]), i, false, true);
 
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
@@ -156,7 +162,7 @@ void	Server::_onHeadLocated(int i, pollfd *sock)
 			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(200);
 
-			_firstTimeSender(&responseObject, sock, i, false, true);
+			_firstTimeSender(&responseObject, &(socks[i]), i, false, true);
 
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
@@ -167,7 +173,7 @@ void	Server::_onHeadLocated(int i, pollfd *sock)
 		_debugMsgI(i, e.what());
 		ResponseGenerator	responseObject(e.what());
 
-		_firstTimeSender(&responseObject, sock, i, true, true);
+		_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
 	}
 }
 
@@ -313,7 +319,7 @@ void	Server::run(void)
 					while (_newConnect > 0)
 					{
 //						std::cout << "Accepted to " << _newConnect << std::endl;
-						for (int j = _lstnN; j < _blogSize; j++)
+						for (int j = _lstnN; j < _connsAmt; j++)
 						{
 							if (socks[j].fd == -1)
 							{
@@ -388,7 +394,7 @@ void	Server::run(void)
 									_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 									_localRecvBuffers[i].find(LFLF) != std::string::npos)
 							{
-								_onHeadLocated(i, &(socks[i]));
+								_onHeadLocated(i, socks);
 							}
 							else
 							{
@@ -465,7 +471,7 @@ void	Server::run(void)
 								_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 								_localRecvBuffers[i].find(LFLF) != std::string::npos)
 						{
-							_onHeadLocated(i, &(socks[i]));
+							_onHeadLocated(i, socks);
 						}
 						else
 						{
@@ -513,6 +519,31 @@ void	Server::run(void)
 		} /* for to iterate thru socks upon poll's return */
 		if (_compressTheArr)
 		{
+			// l l l s s s s s | f f f f f f f f
+			// max fill situation.
+			// _socksN = 8
+			// _filesN = 8
+			// _filesN corrected = 16
+			// we need an index of max file, because....
+			//
+			// l l l s s s f f | f - - - - - - -
+			// 3 socks with 3 corresponding files
+			// l l l s - s f - | f - - - - - - -
+			// whoops! one down. time to close stuff up
+			// _socksN = 6
+			// _filesN = 3
+			// _filesN corrected = 8
+			// filemaxindex = 8 = 6 + 3 - 1
+			// we do this:
+			// l l l s s - f - | f - - - - - - -
+			// because this was a compression until 5(inc) from 3
+			// _socksN = 5 now (true, true)
+			// and it's good if we start from there
+			// but we need to go until the old filemaxindex
+			// MAYBE have the _filesN as a filemaxindex? the same way _socksN kinda is.........
+			// _filesN corrected = 8 (still!)
+			// AND AND AND we should just have fds in the perconarr. they're already unique..
+			// there'll be no problem in referring to them as is instead of using the fd index stuff.
 			_compressTheArr = false;
 			for (int i = _lstnN; i < _socksN; i++)
 			{
@@ -532,8 +563,21 @@ void	Server::run(void)
 					i--;
 				}
 			}
-			// XXX must check out the file bs
-			for (int k = _socksN; k < _connsAmt; k++)
+			for (int f = _socksN; f < _filesN; f++)
+			{
+				if (socks[f].fd == -1)
+				{
+					_filesN--;
+					for (int j = f; j < _filesN; j++)
+					{
+						socks[j].fd = socks[j + 1].fd;
+						socks[j].events = socks[j + 1].events;
+						socks[j].revents = socks[j + 1].revents;
+					}
+					i--;
+				}
+			}
+			for (int k = _socksN + _filesN; k < 2 * _connsAmt; k++)
 			{
 //				std::cout << k << ": " << _perConnArr[k] << std::endl;
 				_localRecvBuffers[k].clear();

@@ -23,8 +23,9 @@ private:
 	time_t		_kaTimeout;
 	std::string	_sendStr;
 	bool		_stillResponding;
-	bool		_hasAFile;
+	bool		_hasFile;
 	bool		_sendingFile;
+	int			_relativeFIndex;
 public:
 	Connect();
 	~Connect();
@@ -36,8 +37,9 @@ public:
 	time_t		getKaTimeout(void) const;
 	std::string	getSendStr(void) const;
 	bool		getStillResponding(void) const;
-	bool		getHasAFile(void) const;
+	bool		getHasFile(void) const;
 	bool		getSendingFile(void) const;
+	int			getRelativeFIndex(void) const;
 
 	void		setNeedsBody(bool v);
 	void		setContLen(size_t v);
@@ -46,8 +48,9 @@ public:
 	void		setKaTimeout(time_t v);
 	void		setSendStr(std::string v);
 	void		setStillResponding(bool v);
-	void		setHasAFile(bool v);
+	void		setHasFile(bool v);
 	void		setSendingFile(bool v);
+	void		setRelativeFIndex(int v);
 
 	void		eraseSendStr(size_t pos, size_t len);
 } ;

@@ -179,3 +179,13 @@ off_t	ResponseGenerator::getFSize(void) const
 {
 	return (_fsize);
 }
+
+int	ResponseGenerator::getFd(void) const
+{
+	return (_fd);
+}
+
+bool	ResponseGenerator::getHasFile(void) const
+{
+	return (_hasFile);
+}
