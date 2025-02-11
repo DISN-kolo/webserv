@@ -56,7 +56,7 @@ public:
 	void		setRemainingFileSize(off_t v);
 
 	void		eraseSendStr(size_t pos, size_t len);
-	off_t		diminishRemainingFileSize(int amt);
+	void		diminishRemainingFileSize(int amt);
 } ;
 
 #endif

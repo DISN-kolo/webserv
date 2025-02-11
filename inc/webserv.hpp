@@ -5,6 +5,10 @@
 # include <iomanip>
 # include <map>
 # include <vector>
+# include <algorithm>
+# include <sys/types.h>
+# include <sys/stat.h>
+# include <fcntl.h>
 
 /*
 class Server ;

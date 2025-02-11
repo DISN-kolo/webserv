@@ -153,7 +153,9 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	{
 		if (_r.find(*it) == 0)
 		{
-			_method = (*it).substr((*it).size() - 1);
+			std::cout << "just fyi, found method's *it == '" << *it << "'" << std::endl;
+			_method = (*it).substr(0, (*it).size() - 1);
+			std::cout << "_method == '" << _method << "'" << std::endl;
 			break ;
 		}
 		it++;
@@ -319,7 +321,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	//"keep-alive: thing=value,thing=value"
 	// or maybe later TODO
 	// keep-alive timeout in seconds by default shall be:
-	_kaTimeout = 5;
+	_kaTimeout = 15;
 
 	// c-l managing
 	if (_method == "POST")

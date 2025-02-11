@@ -43,14 +43,14 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 	// let's say that the location directive is already resolved somewhere prior. here,
 	if (req.getMethod() == "GET")
 	{
-		_fd = open(req.getRTarget(), O_RDONLY);
+		_fd = open(req.getRTarget().c_str(), O_RDONLY);
 		if (_fd == -1)
 		{
 			throw internalServerError();
 		}
 
 		struct stat	st;
-		if (stat(req.getRTarget(), &st) == -1)
+		if (stat(req.getRTarget().c_str(), &st) == -1)
 		{
 			throw internalServerError();
 		}

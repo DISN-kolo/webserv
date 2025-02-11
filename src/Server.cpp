@@ -2,10 +2,10 @@
 
 Server::Server()
 {
-	_rbufSize = 4096;
-	_sbufSize = 4096;
-	//_rbufSize = 3200000;
-	//_sbufSize = 3200000;
+	//_rbufSize = 4096;
+	//_sbufSize = 4096;
+	_rbufSize = 3;
+	_sbufSize = 3;
 	_blogSize = 4096;
 	_connsAmt = 4096;
 	_config = new ServerConfig();
@@ -126,6 +126,8 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 		RequestHeadParser		req(_localRecvBuffers[i]);
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
+		_debugMsgI(i, "the request method was...");
+		_debugMsgI(i, "'" + req.getMethod() + "'");
 		if (req.getMethod() == "POST")
 		{
 			// a body is a must-have then?
@@ -139,6 +141,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 		}
 		else if (req.getMethod() == "GET")
 		{
+			_debugMsgI(i, "we have a get");
 			// TODO filing notes
 			// if it's not a post and we already have a head, we should just stop --drop and roll--
 			// stop and send, I mean. or, you know, generate a proper response, cgi and all that jazz,
@@ -153,6 +156,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			ResponseGenerator	responseObject(req);
 			if (responseObject.getHasFile())
 			{
+				_debugMsgI(i, "it has a file");
 				_perConnArr[i]->setHasFile(true);
 				for (int j = _socksN; j < 2 * _connsAmt; j++)
 				{
@@ -307,7 +311,7 @@ void	Server::run(void)
 			{
 				_debugMsgTimeI(i, curTime);
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
-						&& (!_perConnArr[i]->getStillResponding()))
+						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
 				{
 					_localRecvBuffers[i].clear();
 					_purgeOneConnection(i, &(socks[i].fd));
@@ -342,6 +346,8 @@ void	Server::run(void)
 							if (socks[j].fd == -1)
 							{
 								_socksN++;
+								// be careful with that
+								_filesN++;
 								socks[j].fd = _newConnect;
 								socks[j].events = POLLIN;
 								_perConnArr[j] = new Connect;
@@ -554,7 +560,7 @@ void	Server::run(void)
 							|| ((socks[_tempFdI].revents & POLLHUP) == POLLHUP)
 							|| ((socks[_tempFdI].revents & POLLNVAL) == POLLNVAL))
 					{
-						_debugMsgI(i, "while processing the socket,..")
+						_debugMsgI(i, "while processing the socket,..");
 						_debugMsgI(_tempFdI, "<- its associated file errored.");
 					}
 					else if ((socks[_tempFdI].revents & POLLIN) == POLLIN)
@@ -704,12 +710,15 @@ void	Server::run(void)
 			}
 			for (int k = _filesN; k < 2 * _connsAmt; k++)
 			{
-				_localRecvBuffers[k].clear();
-				if (_perConnArr[k] != NULL)
+				if (k < _connsAmt)
 				{
-//					delete _perConnArr[k];
-					// wait, what if deleting messes up the whole array compression thing!!!!!!!!!!!!!!!!!!!
-					_perConnArr[k] = NULL;
+					_localRecvBuffers[k].clear();
+					if (_perConnArr[k] != NULL)
+					{
+//						delete _perConnArr[k];
+						// wait, what if deleting messes up the whole array compression thing!!!!!!!!!!!!!!!!!!!
+						_perConnArr[k] = NULL;
+					}
 				}
 				socks[k].fd = -1;
 				socks[k].events = 0;

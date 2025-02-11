@@ -1,6 +1,7 @@
 #ifndef RESPONSE_GENERATOR_HPP
 # define RESPONSE_GENERATOR_HPP
 # include "webserv.hpp"
+# include "RequestHeadParser.hpp"
 
 # include <sstream>
 
