@@ -31,7 +31,7 @@ private:
 	void	_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC);
 	void	_onHeadLocated(int i, pollfd *sock);
 	void	_eraseDoubleNlInLocalRecvBuffer(int i);
-	void	_purgeOneConnection(int i, int *fdp);
+	void	_purgeOneConnection(int i, pollfd* socks);
 
 	void	_debugMsgI(int i, std::string msg);
 	void	_debugMsgTimeI(int i, time_t curTime);

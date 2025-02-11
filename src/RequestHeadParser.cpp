@@ -153,9 +153,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	{
 		if (_r.find(*it) == 0)
 		{
-			std::cout << "just fyi, found method's *it == '" << *it << "'" << std::endl;
 			_method = (*it).substr(0, (*it).size() - 1);
-			std::cout << "_method == '" << _method << "'" << std::endl;
 			break ;
 		}
 		it++;

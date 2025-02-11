@@ -2,12 +2,14 @@
 
 Server::Server()
 {
-	//_rbufSize = 4096;
-	//_sbufSize = 4096;
-	_rbufSize = 3;
-	_sbufSize = 3;
-	_blogSize = 4096;
-	_connsAmt = 4096;
+	_rbufSize = 4096;
+	_sbufSize = 4096;
+	//_rbufSize = 2;
+	//_sbufSize = 2;
+	//_blogSize = 4096;
+	//_connsAmt = 4096;
+	_blogSize = 128;
+	_connsAmt = 128;
 	_config = new ServerConfig();
 	_perConnArr = std::vector<Connect * >(_connsAmt, NULL);
 	_nls.push_back(CRLFCRLF);
@@ -52,25 +54,47 @@ void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
 	}
 }
 
-void	Server::_purgeOneConnection(int i, int *fdp)
+void	Server::_purgeOneConnection(int i, pollfd *socks)
 {
 	_localRecvBuffers[i].clear();
-	close(*fdp);
-	*fdp = -1;
+	close(socks[i].fd);
+	socks[i].fd = -1;
+
+	if (_perConnArr[i]->getHasFile())
+	{
+		_tempFdI = -1;
+		for (int j = _socksN; j < _filesN; j++)
+		{
+			if (socks[j].fd == _perConnArr[i]->getFd())
+			{
+				_tempFdI = j;
+				break ;
+			}
+		}
+		if (_tempFdI == -1)
+		{
+			std::cout << "error while purging bc fd not found for " << i << std::endl;
+			delete _perConnArr[_tempFdI];
+			// this will cause a crash FIXME
+		}
+		close(socks[_tempFdI].fd);
+		socks[_tempFdI].fd = -1;
+	}
+
 	delete _perConnArr[i];
 	_perConnArr[i] = NULL;
 	_compressTheArr = true;
 }
 
-void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool clearLRB, bool purgeC)
+void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC)
 {
 	// in case of has file being true, the size would be just of the head
 	if (static_cast<size_t>(_sbufSize) < rO->getSize())
 	{
 		_localSendString = rO->getText().substr(0, _sbufSize);
-		send(sock->fd, _localSendString.c_str(), _sbufSize, 0);
+		send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
 
-		sock->events = POLLOUT;
+		socks[i].events = POLLOUT;
 		_perConnArr[i]->setSendStr(rO->getText());
 		_perConnArr[i]->eraseSendStr(0, _sbufSize);
 		_perConnArr[i]->setStillResponding(true);
@@ -82,17 +106,18 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool c
 	}
 	else
 	{
-		send(sock->fd, rO->getText().c_str(), rO->getSize(), 0);
+		send(socks[i].fd, rO->getText().c_str(), rO->getSize(), 0);
 		_perConnArr[i]->setStillResponding(false);
 		_debugMsgI(i, "sent in one go:");
 		std::cout << rO->getText() << std::endl;
 		if (_perConnArr[i]->getHasFile())
 		{
+			socks[i].events = POLLOUT;
 			_perConnArr[i]->setSendingFile(true);
 		}
 		else
 		{
-			sock->events = POLLIN;
+			socks[i].events = POLLIN;
 		}
 	}
 	_perConnArr[i]->setTimeStarted(time(NULL));
@@ -109,8 +134,9 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *sock, int i, bool c
 				&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
 		{
 			// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
-			_purgeOneConnection(i, &(sock->fd));
-			_debugMsgI(i, "connection purged.");
+			_purgeOneConnection(i, socks);
+			_debugMsgI(i, "connection purged from firsttime");
+			std::cout << "fd must be -1: " << socks[i].fd << std::endl;
 		}
 	}
 }
@@ -172,7 +198,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 				_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
 			}
 
-			_firstTimeSender(&responseObject, &(socks[i]), i, false, true);
+			_firstTimeSender(&responseObject, socks, i, false, true);
 
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
@@ -182,18 +208,21 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(200);
 
-			_firstTimeSender(&responseObject, &(socks[i]), i, false, true);
+			_firstTimeSender(&responseObject, socks, i, false, true);
 
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
 	}
 	catch (std::exception & e)
 	{
+		_debugMsgI(i, "caught something");
+		_perConnArr[i]->setHasFile(false);
+		_perConnArr[i]->setSendingFile(false);
 		_perConnArr[i]->setNeedsBody(false);
 		_debugMsgI(i, e.what());
 		ResponseGenerator	responseObject(e.what());
 
-		_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
+		_firstTimeSender(&responseObject, socks, i, true, true);
 	}
 }
 
@@ -293,12 +322,12 @@ void	Server::run(void)
 							&& (!_perConnArr[i]->getStillResponding()))
 					{
 						_localRecvBuffers[i].clear();
-						_purgeOneConnection(i, &(socks[i].fd));
+						_purgeOneConnection(i, socks);
 					}
 				}
 			}
 		}
-		std::cout << "Just poll'd, socks number is " << _socksN << std::endl;
+		std::cout << "Just poll'd, ret number is " << _retCode << std::endl;
 
 		// go thru all the socks that could have possibly been affected
 		// see if they've been affected
@@ -314,7 +343,7 @@ void	Server::run(void)
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
 				{
 					_localRecvBuffers[i].clear();
-					_purgeOneConnection(i, &(socks[i].fd));
+					_purgeOneConnection(i, socks);
 				}
 			}
 			if (socks[i].revents == 0)
@@ -330,31 +359,46 @@ void	Server::run(void)
 					continue ;
 				}
 				_debugMsgI(i, "got an err/hup/val");
-				_purgeOneConnection(i, &(socks[i].fd));
 			}
 			else if ((socks[i].revents & POLLIN) == POLLIN)
 			{
 				if (i < _lstnN)
 				{
-					// wow is that the listening fd? our sock? yes it is!
-					_newConnect = accept(_listenSocks[i], NULL, NULL);
-					while (_newConnect > 0)
+					if (_socksN < _connsAmt)
 					{
-//						std::cout << "Accepted to " << _newConnect << std::endl;
-						for (int j = _lstnN; j < _connsAmt; j++)
+						// wow is that the listening fd? our sock? yes it is!
+						_newConnect = accept(_listenSocks[i], NULL, NULL);
+						while (_newConnect > 0)
 						{
-							if (socks[j].fd == -1)
+							_socksN++;
+							// be careful with that
+							// XXX TODO important. move files to the right
+							// also check out wtf is going on.
+							_filesN++;
+							_debugMsgI(i, "accepted a connect");
+							_debugMsgI(_socksN, "<-- socksn");
+							for (int j = _lstnN; j < _connsAmt; j++)
 							{
-								_socksN++;
-								// be careful with that
-								_filesN++;
-								socks[j].fd = _newConnect;
-								socks[j].events = POLLIN;
-								_perConnArr[j] = new Connect;
+								_debugMsgI(j, "for index j in socks..");
+								_debugMsgI(socks[j].fd, "<-- this is the fd");
+								if (socks[j].fd == -1)
+								{
+									socks[j].fd = _newConnect;
+									socks[j].events = POLLIN;
+									_perConnArr[j] = new Connect;
+									_debugMsgI(j, "new connect is situated here");
+									break ;
+								}
+							}
+							if (_socksN < _connsAmt)
+							{
+								_newConnect = accept(_listenSocks[i], NULL, NULL);
+							}
+							else
+							{
 								break ;
 							}
 						}
-						_newConnect = accept(_listenSocks[i], NULL, NULL);
 					}
 				}
 				else
@@ -366,7 +410,7 @@ void	Server::run(void)
 					{
 						// to crash or not to crash? XXX to think
 //						throw readError();
-						_purgeOneConnection(i, &(socks[i].fd));
+						_purgeOneConnection(i, socks);
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "_retCode " << _retCode << " but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 					}
@@ -390,7 +434,7 @@ void	Server::run(void)
 									_debugMsgI(i, "Content size is too big, sending a 400");
 									ResponseGenerator	responseObject("400 Bad Request");
 
-									_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
+									_firstTimeSender(&responseObject, socks, i, true, true);
 								}
 								else
 								{
@@ -402,14 +446,14 @@ void	Server::run(void)
 //										someMythicalStringThatWillHoldTheBodyForUseByServer = _localRecvBuffers[i].substr(0, _perConnArr[i]->getContLen());
 										ResponseGenerator	responseObject(200);
 
-										_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
+										_firstTimeSender(&responseObject, socks, i, true, true);
 									}
 									catch (std::exception & e)
 									{
 										_debugMsgI(i, e.what());
 										ResponseGenerator	responseObject(e.what());
 
-										_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
+										_firstTimeSender(&responseObject, socks, i, true, true);
 									}
 								}
 							} /* okay, it didn't ask for a body... at least yet. maybe it's a head? */
@@ -426,11 +470,12 @@ void	Server::run(void)
 								_debugMsgI(i, "Is that some sort of a joke?");
 								_debugMsgI(i, "No double-endline, AND the buff isn't zero... But nothing to read.");
 								_debugMsgI(i, "Timeout-checking...");
+								// XXX file cond?....
 								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									std::cout << "       yup, close it." << std::endl;
 									_localRecvBuffers[i].clear();
-									_purgeOneConnection(i, &(socks[i].fd));
+									_purgeOneConnection(i, socks);
 								}
 							}
 						}
@@ -439,7 +484,7 @@ void	Server::run(void)
 							_debugMsgI(i, "Is that some sort of a joke?");
 							_debugMsgI(i, "Nothing in local buf, the read is 0, how tf did we even get polled????");
 							_localRecvBuffers[i].clear();
-							_purgeOneConnection(i, &(socks[i].fd));
+							_purgeOneConnection(i, socks);
 						}
 					}
 					else if (_retCode > 0)
@@ -465,7 +510,7 @@ void	Server::run(void)
 								_perConnArr[i]->setNeedsBody(false);
 								_debugMsgI(i, "Content size is too big, sending a 400");
 								ResponseGenerator	responseObject("400 Bad Request");
-								_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
+								_firstTimeSender(&responseObject, socks, i, true, true);
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
@@ -476,13 +521,13 @@ void	Server::run(void)
 								{
 									// the try catch is for having a normal response generator, which will be able to throw errors like 502
 									ResponseGenerator	responseObject(200);
-									_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
+									_firstTimeSender(&responseObject, socks, i, true, true);
 								}
 								catch (std::exception & e)
 								{
 									_debugMsgI(i, e.what());
 									ResponseGenerator	responseObject(e.what());
-									_firstTimeSender(&responseObject, &(socks[i]), i, true, true);
+									_firstTimeSender(&responseObject, socks, i, true, true);
 								}
 							}
 							else
@@ -528,6 +573,7 @@ void	Server::run(void)
 						std::cout << _perConnArr[i]->getSendStr() << std::endl;
 						if (_perConnArr[i]->getHasFile())
 						{
+							_debugMsgI(i, "switching to filesending mode");
 							_perConnArr[i]->setSendingFile(true);
 						}
 						else
@@ -584,6 +630,7 @@ void	Server::run(void)
 							socks[_tempFdI].fd = -1;
 							_compressTheArr = true;
 
+							_perConnArr[i]->setHasFile(false);
 							_perConnArr[i]->setSendingFile(false);
 							_perConnArr[i]->setStillResponding(false);
 							socks[i].events = POLLIN;
@@ -606,6 +653,7 @@ void	Server::run(void)
 							socks[_tempFdI].fd = -1;
 							_compressTheArr = true;
 
+							_perConnArr[i]->setHasFile(false);
 							_perConnArr[i]->setSendingFile(false);
 							_perConnArr[i]->setStillResponding(false);
 							socks[i].events = POLLIN;
@@ -641,8 +689,8 @@ void	Server::run(void)
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
 				{
 					// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
-					_purgeOneConnection(i, &(socks[i].fd));
-					_debugMsgI(i, "connection purged.");
+					_purgeOneConnection(i, socks);
+					_debugMsgI(i, "connection purged in pollout");
 				}
 			} /* else if POLLOUT */
 		} /* for to iterate thru socks upon poll's return */
@@ -678,8 +726,11 @@ void	Server::run(void)
 			_compressTheArr = false;
 			for (int i = _lstnN; i < _socksN; i++)
 			{
+				_debugMsgI(i, "checking sock...");
+				_debugMsgI(socks[i].fd, "<-- that's its fd");
 				if (socks[i].fd == -1)
 				{
+					_debugMsgI(i, "caught -1");
 					_socksN--;
 					for (int j = i; j < _socksN; j++)
 					{
@@ -690,26 +741,33 @@ void	Server::run(void)
 						socks[j].fd = socks[j + 1].fd;
 						socks[j].events = socks[j + 1].events;
 						socks[j].revents = socks[j + 1].revents;
+						_debugMsgI(j, "filled with the");
+						_debugMsgI(j + 1, "");
 					}
 					i--;
 				}
 			}
 			for (int f = _socksN; f < _filesN; f++)
 			{
+				_debugMsgI(f, "checking file...");
 				if (socks[f].fd == -1)
 				{
+					_debugMsgI(f, "caught -1");
 					_filesN--;
 					for (int j = f; j < _filesN; j++)
 					{
 						socks[j].fd = socks[j + 1].fd;
 						socks[j].events = socks[j + 1].events;
 						socks[j].revents = socks[j + 1].revents;
+						_debugMsgI(j, "filled with the");
+						_debugMsgI(j + 1, "");
 					}
 					f--;
 				}
 			}
 			for (int k = _filesN; k < 2 * _connsAmt; k++)
 			{
+				_debugMsgI(k, "checking remnants...");
 				if (k < _connsAmt)
 				{
 					_localRecvBuffers[k].clear();
@@ -719,6 +777,7 @@ void	Server::run(void)
 						// wait, what if deleting messes up the whole array compression thing!!!!!!!!!!!!!!!!!!!
 						_perConnArr[k] = NULL;
 					}
+					_debugMsgI(k, "nulld perconnarr and cleared localrecvbuf");
 				}
 				socks[k].fd = -1;
 				socks[k].events = 0;

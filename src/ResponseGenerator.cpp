@@ -37,25 +37,29 @@ ResponseGenerator::ResponseGenerator(const char * ewhat)
 	_text = ss.str();
 }
 
-#include <sys/stat.h>
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 {
 	// let's say that the location directive is already resolved somewhere prior. here,
 	if (req.getMethod() == "GET")
 	{
+		struct stat	st;
+		if (stat(req.getRTarget().c_str(), &st) == -1)
+		{
+			throw internalServerError();
+		}
+		if (st.st_mode != S_IFREG)
+		{
+			throw internalServerError();
+		}
 		_fd = open(req.getRTarget().c_str(), O_RDONLY);
 		if (_fd == -1)
 		{
 			throw internalServerError();
 		}
 
-		struct stat	st;
-		if (stat(req.getRTarget().c_str(), &st) == -1)
-		{
-			throw internalServerError();
-		}
 		_fSize = st.st_size;
 		_hasFile = true;
+		std::cout << "epic! you've just opened a file. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
 
 		std::stringstream	ss;
 		ss << "HTTP/1.1 " << "200 OK" << CRLF;
