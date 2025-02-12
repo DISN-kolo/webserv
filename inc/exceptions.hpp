@@ -77,6 +77,12 @@ class	badRequest: public std::exception
 		virtual const char	*what(void) const throw();
 };
 
+class	notFound: public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	lengthRequired: public std::exception
 {
 	public:

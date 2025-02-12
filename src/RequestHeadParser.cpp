@@ -126,6 +126,7 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 RequestHeadParser::RequestHeadParser(std::string r)
 	:	_r(r)
 {
+	_defaultContentPath = std::string("/tmp/var/www/") + "/filesforserver";
 	_contLen = 0;
 	// bare minimum as per subject
 	_acceptableMethods.push_back("GET ");
@@ -217,8 +218,13 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	}
 
 	_pathDeobfuscator();
+	if (_rTarget == std::string("/"))
+	{
+		_rTarget += "index.html";
+	}
+	_rTarget = _defaultContentPath + _rTarget;
 	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
-	std::cout << "true rtarget: " << _rTarget << std::endl;
+	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
 
 	// amazing, first line parsed.
 	// now, 1. get next line

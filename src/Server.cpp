@@ -2,10 +2,10 @@
 
 Server::Server()
 {
-	//_rbufSize = 4096;
-	//_sbufSize = 4096;
-	_rbufSize = 2;
-	_sbufSize = 2;
+	_rbufSize = 4096;
+	_sbufSize = 4096;
+	//_rbufSize = 2;
+	//_sbufSize = 2;
 	//_blogSize = 4096;
 	//_connsAmt = 4096;
 	_blogSize = 4096;

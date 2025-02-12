@@ -49,7 +49,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		if (statResponse == -1)
 		{
 			std::cout << "it's a stat == -1" << std::endl;
-			throw internalServerError();
+			throw notFound();
 		}
 		if ((st.st_mode & S_IFREG) != S_IFREG)
 		{

@@ -15,6 +15,7 @@ private:
 
 	std::vector<std::string>	_acceptableMethods;
 
+	std::string	_defaultContentPath;
 	// like, the totality
 	std::string	_r;
 
