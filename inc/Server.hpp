@@ -28,6 +28,7 @@ private:
 	Server(const Server & obj);
 	Server &operator=(const Server & obj);
 
+	int		_checkAvailFdI(pollfd *socks) const;
 	void	_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC);
 	void	_onHeadLocated(int i, pollfd *sock);
 	void	_eraseDoubleNlInLocalRecvBuffer(int i);
@@ -52,13 +53,10 @@ private:
 	std::vector<Connect * >		_perConnArr;
 	int							_reuseAddressValue;
 	int 						_timeout;
-	int							_socksN;
-	int							_filesN;
 	int							_lstnN;
-	int							_curSize;
 	bool						_running;
+	int							_connectHereIndex;
 	int							_newConnect;
-	bool						_compressTheArr;
 	int							_retCode;
 	int							_tempFdI;
 

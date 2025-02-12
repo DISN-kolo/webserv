@@ -8,8 +8,8 @@ Server::Server()
 	//_sbufSize = 2;
 	//_blogSize = 4096;
 	//_connsAmt = 4096;
-	_blogSize = 128;
-	_connsAmt = 128;
+	_blogSize = 4096;
+	_connsAmt = 512;
 	_config = new ServerConfig();
 	_perConnArr = std::vector<Connect * >(_connsAmt, NULL);
 	_nls.push_back(CRLFCRLF);
@@ -54,6 +54,22 @@ void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
 	}
 }
 
+int	Server::_checkAvailFdI(pollfd *socks) const
+{
+	int	ret = -1;
+	int	i = _lstnN;
+	while (i < _connsAmt)
+	{
+		if (socks[i].fd == -1)
+		{
+			ret = i;
+			break ;
+		}
+		i++;
+	}
+	return (ret);
+}
+
 void	Server::_purgeOneConnection(int i, pollfd *socks)
 {
 	_localRecvBuffers[i].clear();
@@ -62,28 +78,13 @@ void	Server::_purgeOneConnection(int i, pollfd *socks)
 
 	if (_perConnArr[i]->getHasFile())
 	{
-		_tempFdI = -1;
-		for (int j = _socksN; j < _filesN; j++)
-		{
-			if (socks[j].fd == _perConnArr[i]->getFd())
-			{
-				_tempFdI = j;
-				break ;
-			}
-		}
-		if (_tempFdI == -1)
-		{
-			std::cout << "error while purging bc fd not found for " << i << std::endl;
-			delete _perConnArr[_tempFdI];
-			// this will cause a crash FIXME
-		}
+		_tempFdI = i + _connsAmt;
 		close(socks[_tempFdI].fd);
 		socks[_tempFdI].fd = -1;
 	}
 
 	delete _perConnArr[i];
 	_perConnArr[i] = NULL;
-	_compressTheArr = true;
 }
 
 void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC)
@@ -152,8 +153,6 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 		RequestHeadParser		req(_localRecvBuffers[i]);
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
-		_debugMsgI(i, "the request method was...");
-		_debugMsgI(i, "'" + req.getMethod() + "'");
 		if (req.getMethod() == "POST")
 		{
 			// a body is a must-have then?
@@ -167,7 +166,6 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 		}
 		else if (req.getMethod() == "GET")
 		{
-			_debugMsgI(i, "we have a get");
 			// TODO filing notes
 			// if it's not a post and we already have a head, we should just stop --drop and roll--
 			// stop and send, I mean. or, you know, generate a proper response, cgi and all that jazz,
@@ -182,18 +180,10 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			ResponseGenerator	responseObject(req);
 			if (responseObject.getHasFile())
 			{
-				_debugMsgI(i, "it has a file");
+				_tempFdI = i + _connsAmt;
 				_perConnArr[i]->setHasFile(true);
-				for (int j = _socksN; j < 2 * _connsAmt; j++)
-				{
-					if (socks[j].fd == -1)
-					{
-						_filesN++;
-						socks[j].fd = responseObject.getFd();
-						socks[j].events = POLLIN;
-						break ;
-					}
-				}
+				socks[_tempFdI].fd = responseObject.getFd();
+				socks[_tempFdI].events = POLLIN;
 				_perConnArr[i]->setFd(responseObject.getFd());
 				_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
 			}
@@ -279,7 +269,8 @@ void	Server::run(void)
 	}
 
 	// setup init listening sock in the array of poll's structs
-	for (size_t i = 0; i < _listenSocks.size(); i++)
+	_lstnN = _listenSocks.size();
+	for (int i = 0; i < _lstnN; i++)
 	{
 		socks[i].fd = _listenSocks[i];
 		socks[i].events = POLLIN;
@@ -287,12 +278,8 @@ void	Server::run(void)
 
 	// _timeout is measured in ms
 	_timeout = 1 * 1000;
-	_socksN = _listenSocks.size();
-	_filesN = _socksN;
-	_lstnN = _socksN;
 	// newconnect's -2 is its init value while -1 indicates a fail
 	_newConnect = -2;
-	_compressTheArr = false;
 	char	buf[_rbufSize + 1];
 	char	fileToReadBuf[_sbufSize + 1];
 	// this will store what we read because we shall be able to read in multiple passes before closing the connection.
@@ -303,8 +290,7 @@ void	Server::run(void)
 	time_t	curTime;
 	while (_running)
 	{
-		// this would be a all files N, see a bit below XXX
-		_retCode = poll(socks, _filesN, _timeout);
+		_retCode = poll(socks, _connsAmt * 2, _timeout);
 		curTime = time(NULL);
 		if (_retCode < 0)
 		{
@@ -312,9 +298,7 @@ void	Server::run(void)
 		}
 		else if (_retCode == 0)
 		{
-			// XXX all of these checks and fors should prolly wind up until the actual socks number, and since we're gonna
-			// do the usual files in the poll as well, we should be careful of what we consider to be "_sockN"
-			for (int i = _lstnN; i < _socksN; i++)
+			for (int i = _lstnN; i < _connsAmt; i++)
 			{
 				if (_perConnArr[i] != NULL)
 				{
@@ -331,8 +315,7 @@ void	Server::run(void)
 
 		// go thru all the socks that could have possibly been affected
 		// see if they've been affected
-		_curSize = _socksN;
-		for (int i = 0; i < _curSize; i++)
+		for (int i = 0; i < _connsAmt; i++)
 		{
 			if (socks[i].fd == -1)
 				continue ;
@@ -364,33 +347,20 @@ void	Server::run(void)
 			{
 				if (i < _lstnN)
 				{
-					if (_socksN < _connsAmt)
+					// wow is that the listening fd? our sock? yes it is!
+					_connectHereIndex = _checkAvailFdI(socks);
+					if (_connectHereIndex != -1)
 					{
-						// wow is that the listening fd? our sock? yes it is!
 						_newConnect = accept(_listenSocks[i], NULL, NULL);
 						while (_newConnect > 0)
 						{
-							_socksN++;
-							// be careful with that
-							// XXX TODO important. move files to the right
-							// also check out wtf is going on.
-							_filesN++;
-							_debugMsgI(i, "accepted a connect");
-							_debugMsgI(_socksN, "<-- socksn");
-							for (int j = _lstnN; j < _connsAmt; j++)
-							{
-								_debugMsgI(j, "for index j in socks..");
-								_debugMsgI(socks[j].fd, "<-- this is the fd");
-								if (socks[j].fd == -1)
-								{
-									socks[j].fd = _newConnect;
-									socks[j].events = POLLIN;
-									_perConnArr[j] = new Connect;
-									_debugMsgI(j, "new connect is situated here");
-									break ;
-								}
-							}
-							if (_socksN < _connsAmt)
+//							_debugMsgI(i, "accepted a connect");
+							socks[_connectHereIndex].fd = _newConnect;
+							socks[_connectHereIndex].events = POLLIN;
+							_perConnArr[_connectHereIndex] = new Connect;
+//							_debugMsgI(_connectHereIndex, "<-- new connect is situated here");
+							_connectHereIndex = _checkAvailFdI(socks);
+							if (_connectHereIndex != -1)
 							{
 								_newConnect = accept(_listenSocks[i], NULL, NULL);
 							}
@@ -496,7 +466,7 @@ void	Server::run(void)
 						// (?)
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
 						std::cout << std::setw(4) << i << " > " << std::flush;
-						std::cout << "Message on " << i << " received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << _rbufSize << "." << std::endl;
+						std::cout << "Message received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << _rbufSize << "." << std::endl;
 						_debugMsgI(i, "received:");
 						buf[_retCode] = 0;
 						std::cout << buf << std::endl;
@@ -585,21 +555,7 @@ void	Server::run(void)
 				// oh, we have a file to send? ok. we need to read it, in the same chunk by chunk manner.
 				else
 				{
-					_tempFdI = -1;
-					for (int j = _socksN; j < _filesN; j++)
-					{
-						if (socks[j].fd == _perConnArr[i]->getFd())
-						{
-							_tempFdI = j;
-							break ;
-						}
-					}
-					// TODO remove or fix if it's actually a problem
-					if (_tempFdI == -1)
-					{
-						_debugMsgI(i, "where. fix your stuff please. fd of file not found within the [_socksN.._filesN) indices of the pollfds array");
-						return ;
-					}
+					_tempFdI = i + _connsAmt;
 					// after finding where the file fd is in the poll's list, we check for its revents. irl, it's probably absolutely always ready
 					// but here we have a subject to abide by :P
 					if (((socks[_tempFdI].revents & POLLERR) == POLLERR)
@@ -618,7 +574,7 @@ void	Server::run(void)
 							// file reading error. this is weird; we should've caught it upon opening the file,
 							// but maybe we're reading a 2gb file and the admin deleted it while we were in the middle
 							// thus, this needs appropriate handling FIXME
-							_debugMsgI(i, "retcode on file <1. crashing for lols.");
+							_debugMsgI(i, "retcode on file is < 0. crashing for lols.");
 							return ;
 						}
 						else if (_retCode == 0)
@@ -628,7 +584,6 @@ void	Server::run(void)
 							_debugMsgI(i, "ABSOLUTELY done reading from the asked file. close it up.");
 							close(socks[_tempFdI].fd);
 							socks[_tempFdI].fd = -1;
-							_compressTheArr = true;
 
 							_perConnArr[i]->setHasFile(false);
 							_perConnArr[i]->setSendingFile(false);
@@ -651,7 +606,6 @@ void	Server::run(void)
 
 							close(socks[_tempFdI].fd);
 							socks[_tempFdI].fd = -1;
-							_compressTheArr = true;
 
 							_perConnArr[i]->setHasFile(false);
 							_perConnArr[i]->setSendingFile(false);
@@ -683,7 +637,7 @@ void	Server::run(void)
 				_perConnArr[i]->setTimeStarted(time(NULL));
 				_debugMsgI(i, "reset starting time");
 
-				// something to ponder  XXX
+				//something to ponder XXX
 //				_localRecvBuffers[i].clear();
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
@@ -694,96 +648,6 @@ void	Server::run(void)
 				}
 			} /* else if POLLOUT */
 		} /* for to iterate thru socks upon poll's return */
-		if (_compressTheArr)
-		{
-			// l l l s s s s s | f f f f f f f f
-			// max fill situation.
-			// _socksN = 8
-			// _filesN = 8
-			// _filesN corrected = 16
-			// we need an index of max file, because....
-			//
-			// l l l s s s f f | f - - - - - - -
-			// 3 socks with 3 corresponding files
-			// l l l s - s f - | f - - - - - - -
-			// whoops! one down. time to close stuff up
-			// _socksN = 6
-			// _filesN = 3
-			// _filesN corrected = 8
-			// filemaxindex = 8 = 6 + 3 - 1
-			// we do this:
-			// l l l s s - f - | f - - - - - - -
-			// because this was a compression until 5(inc) from 3
-			// _socksN = 5 now (true, true)
-			// and it's good if we start from there
-			// but we need to go until the old filemaxindex
-			// MAYBE have the _filesN as a filemaxindex? the same way _socksN kinda is.........
-			// _filesN corrected = 8 (still!)
-			// AND AND AND we should just have fds in the perconarr. they're already unique..
-			// there'll be no problem in referring to them as is instead of using the fd index stuff.
-			// we could have a fd-index lookup map hmmmmmmm
-			// but that's just for speed purposes. idk
-			_compressTheArr = false;
-			for (int i = _lstnN; i < _socksN; i++)
-			{
-				_debugMsgI(i, "checking sock...");
-				_debugMsgI(socks[i].fd, "<-- that's its fd");
-				if (socks[i].fd == -1)
-				{
-					_debugMsgI(i, "caught -1");
-					_socksN--;
-					for (int j = i; j < _socksN; j++)
-					{
-						_localRecvBuffers[j] = _localRecvBuffers[j + 1];
-						_perConnArr[j] = _perConnArr[j + 1];
-//						if (_perConnArr[j] == NULL)
-//							std::cout << "alert! at j == " << j << std::endl;
-						socks[j].fd = socks[j + 1].fd;
-						socks[j].events = socks[j + 1].events;
-						socks[j].revents = socks[j + 1].revents;
-						_debugMsgI(j, "filled with the");
-						_debugMsgI(j + 1, "");
-					}
-					i--;
-				}
-			}
-			for (int f = _socksN; f < _filesN; f++)
-			{
-				_debugMsgI(f, "checking file...");
-				if (socks[f].fd == -1)
-				{
-					_debugMsgI(f, "caught -1");
-					_filesN--;
-					for (int j = f; j < _filesN; j++)
-					{
-						socks[j].fd = socks[j + 1].fd;
-						socks[j].events = socks[j + 1].events;
-						socks[j].revents = socks[j + 1].revents;
-						_debugMsgI(j, "filled with the");
-						_debugMsgI(j + 1, "");
-					}
-					f--;
-				}
-			}
-			for (int k = _filesN; k < 2 * _connsAmt; k++)
-			{
-				_debugMsgI(k, "checking remnants...");
-				if (k < _connsAmt)
-				{
-					_localRecvBuffers[k].clear();
-					if (_perConnArr[k] != NULL)
-					{
-//						delete _perConnArr[k];
-						// wait, what if deleting messes up the whole array compression thing!!!!!!!!!!!!!!!!!!!
-						_perConnArr[k] = NULL;
-					}
-					_debugMsgI(k, "nulld perconnarr and cleared localrecvbuf");
-				}
-				socks[k].fd = -1;
-				socks[k].events = 0;
-				socks[k].revents = 0;
-			}
-		}
 		std::cout << "                one cycle done!" << std::endl;
 	} /* while (_running) */
 }

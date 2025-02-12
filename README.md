@@ -3,6 +3,7 @@
 
 ### TODOs
 
+* check out the poll's limits on \_connsAmt. it gives an error if the total polling size is too big... ulimit -n?
 * BEFORE WE DO THE FOLLOWING TWO: relativization of the path
 * writing files
 * deleting files
