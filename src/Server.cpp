@@ -2,10 +2,10 @@
 
 Server::Server()
 {
-	_rbufSize = 4096;
-	_sbufSize = 4096;
-	//_rbufSize = 2;
-	//_sbufSize = 2;
+	//_rbufSize = 4096;
+	//_sbufSize = 4096;
+	_rbufSize = 2;
+	_sbufSize = 2;
 	//_blogSize = 4096;
 	//_connsAmt = 4096;
 	_blogSize = 4096;
@@ -76,15 +76,18 @@ void	Server::_purgeOneConnection(int i, pollfd *socks)
 	close(socks[i].fd);
 	socks[i].fd = -1;
 
-	if (_perConnArr[i]->getHasFile())
+	if (_perConnArr[i] != NULL)
 	{
-		_tempFdI = i + _connsAmt;
-		close(socks[_tempFdI].fd);
-		socks[_tempFdI].fd = -1;
-	}
+		if (_perConnArr[i]->getHasFile())
+		{
+			_tempFdI = i + _connsAmt;
+			close(socks[_tempFdI].fd);
+			socks[_tempFdI].fd = -1;
+		}
 
-	delete _perConnArr[i];
-	_perConnArr[i] = NULL;
+		delete _perConnArr[i];
+		_perConnArr[i] = NULL;
+	}
 }
 
 void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC)
@@ -177,7 +180,9 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			// ALSO check out .... file writing! File writing is done via polling, too. No?
 			// ALSO check out .... just sending regular responses might require poll?????? like.... POLLOUT n stuff....... oh my gaaaaaaawddddddddddd
 			_perConnArr[i]->setNeedsBody(false);
+			_debugMsgI(i, "RO generation started");
 			ResponseGenerator	responseObject(req);
+			_debugMsgI(i, "RO generated successfully");
 			if (responseObject.getHasFile())
 			{
 				_tempFdI = i + _connsAmt;
@@ -342,6 +347,8 @@ void	Server::run(void)
 					continue ;
 				}
 				_debugMsgI(i, "got an err/hup/val");
+				_localRecvBuffers[i].clear();
+				_purgeOneConnection(i, socks);
 			}
 			else if ((socks[i].revents & POLLIN) == POLLIN)
 			{

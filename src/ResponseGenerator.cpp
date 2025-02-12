@@ -42,18 +42,25 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 	// let's say that the location directive is already resolved somewhere prior. here,
 	if (req.getMethod() == "GET")
 	{
+		std::cout << "it's a get of '" << req.getRTarget().c_str() << "'" << std::endl;
 		struct stat	st;
-		if (stat(req.getRTarget().c_str(), &st) == -1)
+		int			statResponse;
+		statResponse = stat(req.getRTarget().c_str(), &st);
+		if (statResponse == -1)
 		{
+			std::cout << "it's a stat == -1" << std::endl;
 			throw internalServerError();
 		}
-		if (st.st_mode != S_IFREG)
+		if ((st.st_mode & S_IFREG) != S_IFREG)
 		{
+			std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
+			std::cout << st.st_mode << std::endl;
 			throw internalServerError();
 		}
 		_fd = open(req.getRTarget().c_str(), O_RDONLY);
 		if (_fd == -1)
 		{
+			std::cout << "it's an fd == -1" << std::endl;
 			throw internalServerError();
 		}
 
