@@ -25,6 +25,7 @@ private:
 	bool		_stillResponding;
 	bool		_hasFile;
 	bool		_sendingFile;
+	bool		_writingFile;
 	int			_fd;
 	off_t		_remainingFileSize;
 public:
@@ -40,6 +41,7 @@ public:
 	bool		getStillResponding(void) const;
 	bool		getHasFile(void) const;
 	bool		getSendingFile(void) const;
+	bool		getWritingFile(void) const;
 	int			getFd(void) const;
 	off_t		getRemainingFileSize(void) const;
 
@@ -52,6 +54,7 @@ public:
 	void		setStillResponding(bool v);
 	void		setHasFile(bool v);
 	void		setSendingFile(bool v);
+	void		setWritingFile(bool v);
 	void		setFd(int v);
 	void		setRemainingFileSize(off_t v);
 

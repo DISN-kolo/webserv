@@ -66,7 +66,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 
 		_fSize = st.st_size;
 		_hasFile = true;
-		std::cout << "epic! you've just opened a file. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
+		std::cout << "epic! you've just opened a file to READ. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
 
 		std::stringstream	ss;
 		ss << "HTTP/1.1 " << "200 OK" << CRLF;
@@ -74,6 +74,34 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		ss << "Server: " << _getServerName() << CRLF;
 		ss << "Content-Type: " << _getContentType() << CRLF;
 		ss << "Content-Length: " << _fSize << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+	}
+	else if (req.getMethod() == "POST")
+	{
+		std::cout << "it's a post of '" << req.getRTarget().c_str() << "'" << std::endl;
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(req.getRTarget().c_str(), &st);
+		if (statResponse != -1)
+		{
+			std::cout << "it's a stat != -1: file exists already. idk" << std::endl;
+			throw internalServerError();
+		}
+		_fd = open(req.getRTarget().c_str(), O_WRONLY);
+		if (_fd == -1)
+		{
+			std::cout << "it's an fd == -1" << std::endl;
+			throw internalServerError();
+		}
+
+		std::cout << "epic! you've just opened a file to WRITE. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << "." << std::endl;
+
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "201 Created" << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Type: " << _getContentType() << CRLF;
 		ss << CRLF;
 		_text = ss.str();
 	}

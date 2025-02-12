@@ -135,7 +135,7 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool 
 	if (purgeC)
 	{
 		if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
-				&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
+				&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
 		{
 			// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
 			_purgeOneConnection(i, socks);
@@ -166,6 +166,11 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
 			_eraseDoubleNlInLocalRecvBuffer(i);
+			_perConnArr[i]->setWritingFile(true);
+			_tempFdI = i + _connsAmt;
+			socks[_tempFdI].fd = responseObject.getFd();
+			socks[_tempFdI].events = POLLOUT;
+			_perConnArr[i]->setFd(responseObject.getFd());
 		}
 		else if (req.getMethod() == "GET")
 		{

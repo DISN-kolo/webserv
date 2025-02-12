@@ -16,6 +16,7 @@ Connect &Connect::operator=(const Connect & obj)
 	_stillResponding = obj.getStillResponding();
 	_hasFile = obj.getHasFile();
 	_sendingFile = obj.getSendingFile();
+	_writingFile = obj.getWritingFile();
 	_fd = obj.getFd();
 	_remainingFileSize = obj.getRemainingFileSize();
 	return (*this);
@@ -75,6 +76,11 @@ bool	Connect::getSendingFile(void) const
 	return (_sendingFile);
 }
 
+bool	Connect::getWritingFile(void) const
+{
+	return (_writingFile);
+}
+
 int		Connect::getFd(void) const
 {
 	return (_fd);
@@ -129,6 +135,11 @@ void	Connect::setHasFile(bool v)
 void	Connect::setSendingFile(bool v)
 {
 	_sendingFile = v;
+}
+
+void	Connect::setWritingFile(bool v)
+{
+	_writingFile = v;
 }
 
 void	Connect::setFd(int v)
