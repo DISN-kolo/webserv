@@ -126,7 +126,7 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 RequestHeadParser::RequestHeadParser(std::string r)
 	:	_r(r)
 {
-	_defaultContentPath = std::string("/tmp/var/www/") + "/filesforserver";
+	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
 	_contLen = 0;
 	// bare minimum as per subject
 	_acceptableMethods.push_back("GET ");
@@ -217,13 +217,13 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		wcount++;
 	}
 
+	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	_pathDeobfuscator();
 	if (_rTarget == std::string("/"))
 	{
 		_rTarget += "index.html";
 	}
 	_rTarget = _defaultContentPath + _rTarget;
-	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
 
 	// amazing, first line parsed.
@@ -276,7 +276,12 @@ RequestHeadParser::RequestHeadParser(std::string r)
 			// sorry croski but it's straight to the next field.
 			if (line.find("\r") == line.size() - 1)
 			{
-				_head[helper] = line.substr(pos, line.size() - 1);
+				std::cout << "\\r located on position " << line.find("\r") << std::endl;
+				_head[helper] = line.substr(pos + 1, line.size() - 2 - pos);
+			}
+			else
+			{
+				_head[helper] = line.substr(pos + 1, line.size() - 1 - pos);
 			}
 			// rm spaces. it's optional tho
 			if (*(_head[helper].begin()) == ' ')
@@ -291,6 +296,15 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		}
 	}
 
+	std::cout << "let's print everything" << std::endl;
+	for (auto it = _head.begin(); it != _head.end(); it++)
+	{
+		std::cout << std::endl;
+		std::cout << "'" << it->first << "'" << std::endl;
+		std::cout << "is..." << std::endl;
+		std::cout << "'" << it->second << "'" << std::endl;
+		std::cout << std::endl;
+	}
 	// k-a managing, part 1
 	helper = _head["connection"];
 	std::string::iterator	itt = helper.begin();
@@ -338,8 +352,8 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		cls >> _contLen;
 		if (cls.fail() || cls.peek() > 0)
 		{
-			std::cout << std::setw(7) << " > " << std::flush;
-			std::cout << "Content length '" << _head["content-length"] << "' found to be bad" << std::endl;
+			std::cout << _contLen << std::endl;
+			std::cout << "     > " << "Content length '" << _head["content-length"] << "' found to be bad" << std::endl;
 			throw badRequest();
 		}
 	}

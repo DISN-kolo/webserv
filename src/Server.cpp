@@ -149,7 +149,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 {
 	_debugMsgI(i, "Head located. Stop reading for a moment");
 	_debugMsgI(i, "Total msg:");
-	std::cout << _localRecvBuffers[i] << std::flush;
+	std::cout << _localRecvBuffers[i] << std::endl;
 	// in case RHP fails; keep-alive is the default for http 1.1
 	try
 	{
@@ -162,7 +162,9 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			// well, yeah iirc...
 			// so this means we won't enter this function anymore I think.
 			// we need to .erase up to the newline x2 mark (inclusive), and start taking in the body
-			// but that's something to consider for the run function
+			_debugMsgI(i, "RO generation started");
+			ResponseGenerator	responseObject(req);
+			_debugMsgI(i, "RO generated successfully");
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
 			_eraseDoubleNlInLocalRecvBuffer(i);
@@ -171,6 +173,9 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			socks[_tempFdI].fd = responseObject.getFd();
 			socks[_tempFdI].events = POLLOUT;
 			_perConnArr[i]->setFd(responseObject.getFd());
+			// we don't send stuff just yet. 201 created should probably be sent when we're done reading, right?
+			// then, we save the contents of ro to sendstr i think.
+			_perConnArr[i]->setSendStr(responseObject.getText());
 		}
 		else if (req.getMethod() == "GET")
 		{

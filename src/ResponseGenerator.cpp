@@ -17,7 +17,7 @@ ResponseGenerator::ResponseGenerator(int code)
 	ss << CRLF;
 	ss << cont;
 	// no vvvv ? FIXME remove it?
-	ss << CRLF;
+//	ss << CRLF;
 	_text = ss.str();
 }
 
@@ -33,7 +33,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat)
 	ss << CRLF;
 	ss << cont;
 	// no vvvv ? FIXME remove it?
-	ss << CRLF;
+//	ss << CRLF;
 	_text = ss.str();
 }
 
@@ -85,10 +85,11 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		statResponse = stat(req.getRTarget().c_str(), &st);
 		if (statResponse != -1)
 		{
+			// FIXME update existing file instead? idk lol
 			std::cout << "it's a stat != -1: file exists already. idk" << std::endl;
 			throw internalServerError();
 		}
-		_fd = open(req.getRTarget().c_str(), O_WRONLY);
+		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
 		if (_fd == -1)
 		{
 			std::cout << "it's an fd == -1" << std::endl;
@@ -101,7 +102,6 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		ss << "HTTP/1.1 " << "201 Created" << CRLF;
 		ss << "Date: " << _getDate() << CRLF;
 		ss << "Server: " << _getServerName() << CRLF;
-		ss << "Content-Type: " << _getContentType() << CRLF;
 		ss << CRLF;
 		_text = ss.str();
 	}
