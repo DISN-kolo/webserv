@@ -17,7 +17,7 @@ ResponseGenerator::ResponseGenerator(int code)
 	ss << CRLF;
 	ss << cont;
 	// no vvvv ? FIXME remove it?
-//	ss << CRLF;
+	ss << CRLF;
 	_text = ss.str();
 }
 
@@ -33,7 +33,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat)
 	ss << CRLF;
 	ss << cont;
 	// no vvvv ? FIXME remove it?
-//	ss << CRLF;
+	ss << CRLF;
 	_text = ss.str();
 }
 

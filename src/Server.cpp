@@ -78,11 +78,13 @@ void	Server::_purgeOneConnection(int i, pollfd *socks)
 
 	if (_perConnArr[i] != NULL)
 	{
-		if (_perConnArr[i]->getHasFile())
+		_tempFdI = i + _connsAmt;
+		if (socks[_tempFdI].fd != -1)
 		{
-			_tempFdI = i + _connsAmt;
 			close(socks[_tempFdI].fd);
 			socks[_tempFdI].fd = -1;
+			// TODO
+			_debugMsgI(i, "file -1'd; don't forget to unlink/remove it if it's from post and you need it gone");
 		}
 
 		delete _perConnArr[i];
@@ -305,6 +307,7 @@ void	Server::run(void)
 	_localRecvBuffers = std::vector<std::string>(_connsAmt, "");
 	// this will store post request strings for them to be written chunk by chunk into the files via poll
 	_localFWriteBuffers = std::vector<std::string>(_connsAmt, "");
+	_fWCounts = std::vector<size_t>(_connsAmt, 0);
 
 	std::cout << "Alright, starting. Ports: " << *(lPorts.begin()) << ".." << *(lPorts.end() - 1) << std::endl;
 	_running = true;
@@ -505,7 +508,7 @@ void	Server::run(void)
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
-								_localFWriteBuffers[i + _connsAmt] += std::string(buf);
+								_localFWriteBuffers[i] += std::string(buf);
 								_perConnArr[i]->setNeedsBody(false);
 								// we don't try to reply here. we only try to reply if we've finished writing the file to the disk.
 //								try
@@ -523,7 +526,7 @@ void	Server::run(void)
 							}
 							else
 							{
-								_localFWriteBuffers[i + _connsAmt] += std::string(buf);
+								_localFWriteBuffers[i] += std::string(buf);
 								_debugMsgI(i, "Content smaller than expected... continue reading thru the next cycle. Added to local fw buf.");
 							}
 						}
@@ -680,6 +683,12 @@ void	Server::run(void)
 			if (socks[i].revents == 0)
 			{
 				std::cout << "revents on " << i << " is 0" << std::endl;
+				if ((!_perConnArr[i - _connsAmt]->getKeepAlive() || _perConnArr[i - _connsAmt]->getKaTimeout() < time(NULL) - _perConnArr[i - _connsAmt]->getTimeStarted()))
+				{
+					// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
+					_purgeOneConnection(i - _connsAmt, socks);
+					_debugMsgI(i, "connection timeouted in filewriting");
+				}
 				continue ;
 			}
 			else if (((socks[i].revents & POLLERR) == POLLERR) || ((socks[i].revents & POLLHUP) == POLLHUP) || ((socks[i].revents & POLLNVAL) == POLLNVAL))
@@ -693,10 +702,50 @@ void	Server::run(void)
 				if (static_cast<size_t>(_rbufSize) < _localFWriteBuffers[i - _connsAmt].size())
 				{
 					write(socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _rbufSize);
+					_debugMsgI(i, "wrote an rbuf-sized chunk");
+					_debugMsgI(i, _localFWriteBuffers[i - _connsAmt].substr(0, _rbufSize));
+					_fWCounts[i - _connsAmt] += _rbufSize;
+					_localFWriteBuffers[i - _connsAmt].erase(0, _rbufSize);
+					_debugMsgI(i, "remains after erasing:");
+					_debugMsgI(i, _localFWriteBuffers[i - _connsAmt]);
 				}
-				_localRecvBuffers.erase
+				else
+				{
+					write(socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _localFWriteBuffers[i - _connsAmt].size());
+					_debugMsgI(i, "wrote a less than rbuf sized chunk");
+					_debugMsgI(i, _localFWriteBuffers[i - _connsAmt]);
+					_fWCounts[i - _connsAmt] += _localFWriteBuffers[i - _connsAmt].size();
+					_localFWriteBuffers[i - _connsAmt].clear();
+				}
+				_debugMsgI(i, "total fwcount is..");
+				std::cout << _fWCounts[i - _connsAmt] << std::endl;
+				_perConnArr[i - _connsAmt]->setTimeStarted(time(NULL));
+				_debugMsgI(i, "reset starting time");
 			}
-		}
+			if (_fWCounts[i - _connsAmt] == _perConnArr[i - _connsAmt]->getContLen())
+			{
+				// done. close the file
+				close(socks[i].fd);
+				socks[i].fd = -1;
+				// must send the 201 created now
+				socks[i - _connsAmt].events = POLLOUT;
+				_perConnArr[i - _connsAmt]->setWritingFile(false);
+				_perConnArr[i - _connsAmt]->setNeedsBody(false);
+				_perConnArr[i - _connsAmt]->setStillResponding(true);
+			}
+			else if (_fWCounts[i - _connsAmt] > _perConnArr[i - _connsAmt]->getContLen())
+			{
+				// XXX TODO FIXME
+				_debugMsgI(i, "too much");
+				return ;
+			}
+			else if ((!_perConnArr[i - _connsAmt]->getKeepAlive() || _perConnArr[i - _connsAmt]->getKaTimeout() < time(NULL) - _perConnArr[i - _connsAmt]->getTimeStarted()))
+			{
+				// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
+				_purgeOneConnection(i - _connsAmt, socks);
+				_debugMsgI(i, "connection timeouted in filewriting");
+			}
+		} /* for files in socks */
 		std::cout << "                one cycle done!" << std::endl;
 	} /* while (_running) */
 }
