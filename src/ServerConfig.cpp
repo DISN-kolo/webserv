@@ -35,93 +35,114 @@ void	ServerConfig::_parseConfig(const std::string &file)
 {
 	std::ifstream	configFile((file).c_str());
 	std::string		line;
-	int				brackets = 0;
+	int				brackets = 0, i = 0;
 	
 	if (!configFile.is_open())
 		throw configFileException();
 	_config.push_back(config());
 	while (std::getline(configFile, line))
 	{
+		i++;
 		try {
-			_getConfigLine(line, brackets);
+			_parseLine(line, brackets);
 		} catch (std::exception &err)
 		{
-			std::cout << err.what() << std::endl;
+			std::cout << "Line " << i << ": " << err.what() << std::endl;
 		}
 	}
 	configFile.close();
 }
 
-void	ServerConfig::_getConfigLine(const std::string &str, int &brackets)
+void	ServerConfig::_parseLine(const std::string &line, int &brackets)
 {
+	std::string					validLine, key;
 	std::vector<std::string>	values;
-	std::string					key;
-	int							i = 0, j = 0;
 
-	while (str[i] && std::isspace(str[i]))
-		i++;
-	if (str[i] == '}')
+	validLine = _getLine(line);
+	if (validLine.empty())
+		return;
+	if (validLine == "}")
 	{
-		if (brackets > 0)
-			brackets--;
-		else
-		{
-			throw configFileBracketsException();
-		}
-		std::cout << brackets << std::endl;
+		brackets--;
+		return;
 	}
-	if (!str[i] || str[i] == '#')
-		return ;
-	while (str[i + j] && str[i + j] != ':')
-		j++;
-	if (j == 0)
+	if (validLine[validLine.length() - 1] != ';' && validLine[validLine.length() - 1] != '{')
 		throw configFileLineException();
-	key = str.substr(i, j);
-	std::cout << "KEY: " << key << " Values: ";
-	values = _getConfigValues(str.substr(i + j + 1));
+	key = _getLineKey(validLine);
+	values = _getLineValues(validLine);
+
 	_validateConfigValues(key, values, brackets);
+
+	/*
+	std::cout << "KEY:" << key << "				";
+	std::cout << "VALUES:";
+	for (size_t i = 0; i < values.size(); i++)
+		std::cout << values[i] << "|";
+	std::cout << "[" << brackets << "]" << std::endl;
+	*/
 }
 
-std::vector<std::string> ServerConfig::_getConfigValues(const std::string &str)
-{
-	std::vector<std::string>	values;
-	std::string					value;
-	int	i = 0, j;
-
-	while (str[i])
-	{
-		j = 0;
-		while (str[i + j] && str[i + j] != ',' && str[i + j] != ';')
-			j++;
-		value = _getConfigValue(str.substr(i, j));
-		if (!value.size())
-			throw configFileLineException();
-		values.push_back(value);
-		std::cout << value << "|";
-		if (str[i + j] == ';' || (values.size() == 1 && values[values.size() - 1] == "{"))
-			break;
-		if (!str[i + j])
-			throw configFileLineException();
-		i += j + 1;
-	}
-	std::cout << std::endl;
-	return values;
-}
-
-std::string ServerConfig::_getConfigValue(const std::string &str)
+std::string	ServerConfig::_getLine(const std::string &line)
 {
 	int	i = 0, j = 0;
 
-	while (str[i] && std::isspace(str[i]))
+	while (line[i] && std::isspace(line[i]))
 		i++;
-	while (str[i + j])
-	{
-		if (str[i + j] == '{')
-			return ("{");
+	while (line[i + j] && line[i + j] != '#')
 		j++;
-	}
-	return (str.substr(i, j));
+	if (!j)
+		return ("");
+	j--;
+	while (std::isspace(line[i + j]))
+		j--;
+	return (line.substr(i, j + 1));
 }
+
+std::string	ServerConfig::_getLineKey(const std::string &line)
+{
+	int	i = 0;
+
+	while (line[i] && line[i] != ':')
+		i++;
+	i--;
+	while (i > 0 && std::isspace(line[i]))
+		i--;
+	return (line.substr(0, i + 1));
+}
+
+std::vector<std::string>	ServerConfig::_getLineValues(const std::string &line)
+{
+	std::vector<std::string>	values;
+	std::string					value;
+	int							i = 0;
+
+	while (line[i] && line[i] != ':')
+		i++;
+	std::stringstream			str(line.substr(i + 1));
+	while (getline(str, value, ','))
+		values.push_back(_getLineValue(value));
+	return (values);
+}
+
+std::string	ServerConfig::_getLineValue(const std::string &value)
+{
+	int	i = 0, j = 0;
+
+	while (value[i] && std::isspace(value[i]))
+		i++;
+	while (value[i + j])
+		j++;
+	j--;
+	while (j > 0 && std::isspace(value[i + j]))
+		j--;
+	if (!j && value[i + j] == ';')
+		throw configFileLineException();
+	if (value[i + j] == ';')
+		j--;
+	return (value.substr(i, j + 1));
+}
+
+
 
 void	ServerConfig::_validateConfigValues(const std::string &key, const std::vector<std::string> values, int &brackets)
 {
@@ -148,11 +169,40 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 	}
 	else
 	{
+		if (!brackets)
+			throw configFileLineException();
 		if (key == "port")
+			_validatePort(values, brackets);
+		else if (key == "host")
+			_validateHost(values, brackets);
+		else if (key == "server_name")
+			_validateServerName(values, brackets);
+		else if (key == "error_page")
+			_validateErrorPage(values, brackets);
+		else if (key == "client_max_body_size")
+			_validateMaxBody(values, brackets);
+		else if (key == "root")
+			_validateRoot(values, brackets);
+		else if (key == "index")
+			_validateIndex(values, brackets);
+		else if (key == "autoindex")
+			_validateAutoindex(values, brackets);
+		else if (key == "allow_methods")
+			_validateMethods(values, brackets);
+		else if (key == "name")
+			_validateName(values, brackets);
+		else if (key == "alias")
+			_validateAlias(values, brackets);
+		else if (key == "cgi_path")
+			_validateCgiPath(values, brackets);
+		else if (key == "cgi_ext")
+			_validateCgiExt(values, brackets);
+		else
 		{
-			if (values.size() == 1 && _validateNbr(values[0]))
-				_config.back().port = _stoi(values[0]);
+			std::cout << "NULL KEY " << key << std::endl;
+			throw configFileLineException();
 		}
+
 	}
 }
 
@@ -161,14 +211,180 @@ bool	ServerConfig::_validateChildValue(const std::vector<std::string> values)
 	return (values.size() == 1 && values[0] == "{");
 }
 
-bool	ServerConfig::_validateNbr(const std::string &value)
+void	ServerConfig::_validateAutoindex(std::vector<std::string> values, int brackets)
 {
-	for (size_t i = 0; i < value.length() - 1; i++)
+	bool	autoIndex;
+	if (values.size() != 1)
+		throw configFileLineException();
+	if (values[0] == "on")
+		autoIndex = true;
+	else if (values[0] == "off")
+		autoIndex = false;
+	else
+		throw configFileLineException();
+	if (brackets == 1)
+		_config.back().autoIndex = autoIndex;
+	else
+		_config.back().routes.back().autoIndex = autoIndex;
+}
+
+void	ServerConfig::_validateMaxBody(std::vector<std::string> values, int brackets)
+{
+	std::string	u;
+	int			i = 0, n;
+
+	if (values.size() != 1)
+		throw configFileLineException();
+	while (std::isdigit(values[0][i]))
+		i++;
+	n = _stoi(values[0].substr(0, i));
+	u = values[0].substr(i);
+	if (u == "GB")
+		n *= 1024 * 1024 * 1024;
+	else if (u == "MB")
+		n *= 1024 * 1024;
+	else if (u == "KB")
+		n *= 1024;
+	else if (!u.empty())
+		throw configFileLineException();
+	if (brackets == 1)
+		_config.back().maxBodySize = n;
+	else
+		_config.back().routes.back().maxBodySize = n;
+}
+
+void	ServerConfig::_validateHost(std::vector<std::string> values, int brackets)
+{
+	std::string	str;
+	int			n;
+
+	if (values.size() != 1 || brackets == 2)
+		throw configFileLineException();
+	std::stringstream			sstr(values[0]);
+	while (getline(sstr, str, '.'))
 	{
-		if (!std::isdigit(value[i]))
-			return false;
+		for (int i = 0; str[i]; i++)
+		{
+			if (!std::isdigit(str[i]))
+				throw configFileLineException();
+		}
+		n = _stoi(str);
+		if (n < 0 || n > 255)
+			throw configFileLineException();
 	}
-	return true;
+	_config.back().host = values[0];
+}
+
+void	ServerConfig::_validateServerName(std::vector<std::string> values, int brackets)
+{
+	if (values.size() != 1 || brackets == 2)
+		throw configFileLineException();
+	for (int i = 0; values[0][i]; i++)
+	{
+		if (values[0][i] == '/')
+			throw configFileLineException();
+	}
+	_config.back().name = values[0];
+}
+
+void	ServerConfig::_validateRoot(std::vector<std::string> values, int brackets)
+{
+	if (values.size() != 1)
+		throw configFileLineException();
+	if (brackets == 1)
+		_config.back().root = values[0];
+	else
+		_config.back().routes.back().root = values[0];
+}
+
+void	ServerConfig::_validateIndex(std::vector<std::string> values, int brackets)
+{
+	if (values.size() != 1)
+		throw configFileLineException();
+	if (brackets == 1)
+		_config.back().root = values[0];
+	else
+		_config.back().routes.back().root = values[0];
+}
+
+void	ServerConfig::_validateName(std::vector<std::string> values, int brackets)
+{
+	if (values.size() != 1 || brackets == 1)
+		throw configFileLineException();
+	_config.back().routes.back().root = values[0];
+}
+
+void	ServerConfig::_validateAlias(std::vector<std::string> values, int brackets)
+{
+	if (values.size() != 1 || brackets == 1)
+		throw configFileLineException();
+	_config.back().routes.back().alias = values[0];
+}
+
+void	ServerConfig::_validatePort(std::vector<std::string> values, int brackets)
+{
+	std::vector<int>	ports;
+	int					n;
+
+	if (brackets != 1)
+		throw configFileLineException();
+	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
+	{
+		for (size_t j = 0; j < (*i).length() - 1; j++)
+		{
+			if (!std::isdigit((*i)[j]))
+				throw configFileLineException();
+		}
+		n = _stoi(*i);
+		if (n >= 1024 && n <= 65535)
+			ports.push_back(n);
+		else
+			throw configFileLineException();
+	}
+	_config.back().ports = ports;
+}
+
+void	ServerConfig::_validateMethods(std::vector<std::string> values, int brackets)
+{
+	std::vector<std::string>	methods;
+	(void) values;
+
+	if (brackets == 1)
+		_config.back().accMethods = methods;
+	else
+		_config.back().routes.back().accMethods = methods;
+}
+
+void	ServerConfig::_validateCgiPath(std::vector<std::string> values, int brackets)
+{
+	std::vector<std::string>	paths;
+	(void) values;
+	
+	if (brackets == 1)
+		_config.back().cgiPath = paths;
+	else
+		_config.back().routes.back().cgiPath = paths;
+}
+
+void	ServerConfig::_validateCgiExt(std::vector<std::string> values, int brackets)
+{
+	std::vector<std::string>	exts;
+	(void) values;
+	
+	if (brackets == 1)
+		_config.back().cgiEx = exts;
+	else
+		_config.back().routes.back().cgiEx = exts;
+}
+
+void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brackets)
+{
+	std::vector<std::pair<std::string, std::string> > errors;
+	(void) values;
+
+	if (brackets == 2)
+		throw configFileLineException();
+	_config.back().customErrors = errors;
 }
 
 int	ServerConfig::_stoi(const std::string &str)
