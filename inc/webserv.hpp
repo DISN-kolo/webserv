@@ -19,6 +19,7 @@ class ServerConfig ;
 # include "ServerConfig.hpp"
 */
 
+# define KA_TIME 3
 # ifndef CRLF
 #  define CRLF "\r\n"
 # endif

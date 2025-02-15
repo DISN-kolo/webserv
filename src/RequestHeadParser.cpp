@@ -340,7 +340,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	//"keep-alive: thing=value,thing=value"
 	// or maybe later TODO
 	// keep-alive timeout in seconds by default shall be:
-	_kaTimeout = 15;
+	_kaTimeout = KA_TIME;
 
 	// c-l managing
 	if (_method == "POST")

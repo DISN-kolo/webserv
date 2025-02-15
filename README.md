@@ -13,4 +13,4 @@
 
 * ctrl+C in telnet/nc leads to a weird timeout situation? I guess. *Idk if that's an improper termination problem or the server's problem.*
 * sbuf/rbuf above the size of sending produces an infinite do-nothing loop on an always-hitting poll
-* Ctrl+R spam on buf size==2 results in a painless(?) crash. why? how? wtf
+* keepalive not functioning in bus size 2
