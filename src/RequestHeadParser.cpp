@@ -219,6 +219,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 
 	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	_pathDeobfuscator();
+	// check config for rules of "index / default index" TODO
 	if (_rTarget == std::string("/"))
 	{
 		_rTarget += "index.html";

@@ -142,7 +142,7 @@ std::string	ResponseGenerator::_getContent(int code)
 std::string	ResponseGenerator::_getErrorPage(std::string ewhat)
 {
 	std::string	ret;
-	ret = "<head align=\"center\">" + ewhat + "</head>";
+	ret = "<head></head><body><p align=\"center\">" + ewhat + "</p></body>";
 	return (ret);
 }
 

@@ -178,6 +178,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			_tempFdI = i + _connsAmt;
 			socks[_tempFdI].fd = responseObject.getFd();
 			socks[_tempFdI].events = POLLOUT;
+			// FIXME clean me broooo vvvvvvvvvvvvvvv we don't need the fd variable no more? cuz like it's the socks[i + _connsAmt], always
 			_perConnArr[i]->setFd(responseObject.getFd());
 			// we don't send stuff just yet. 201 created should probably be sent when we're done reading, right?
 			// then, we save the contents of ro to sendstr i think.
@@ -199,6 +200,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			_debugMsgI(i, "RO generation started");
 			ResponseGenerator	responseObject(req);
 			_debugMsgI(i, "RO generated successfully");
+			// FIXME we don't need this if if it's always true after a non-throwing response object generation
 			if (responseObject.getHasFile())
 			{
 				_tempFdI = i + _connsAmt;
@@ -226,6 +228,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 	}
 	catch (std::exception & e)
 	{
+		// TODO specific server errors (if it's a malloc error, just send a 500 or something. check by making all our server errors of the same sub-class or something.)
 		_debugMsgI(i, "caught something");
 		_perConnArr[i]->setHasFile(false);
 		_perConnArr[i]->setSendingFile(false);
@@ -362,9 +365,9 @@ void	Server::run(void)
 				{
 					_debugMsgI(i, "_listenSock got a pollerr or a pollhup or an nval");
 					continue ;
+					// XXX ?
 				}
 				_debugMsgI(i, "got an err/hup/val");
-				_localRecvBuffers[i].clear();
 				_purgeOneConnection(i, socks);
 			}
 			else if ((socks[i].revents & POLLIN) == POLLIN)
@@ -376,6 +379,7 @@ void	Server::run(void)
 					if (_connectHereIndex != -1)
 					{
 						_newConnect = accept(_listenSocks[i], NULL, NULL);
+//						_newConnect = accept(socks[i].fd, NULL, NULL);
 						while (_newConnect > 0)
 						{
 //							_debugMsgI(i, "accepted a connect");
