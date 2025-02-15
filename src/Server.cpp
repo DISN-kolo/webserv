@@ -573,6 +573,9 @@ void	Server::run(void)
 						if (_perConnArr[i]->getHasFile())
 						{
 							_debugMsgI(i, "switching to filesending mode");
+							_debugMsgI(socks[i + _connsAmt].fd, "<- file's fd");
+							if (socks[i + _connsAmt].events == POLLIN)
+								_debugMsgI(i, "pollin on the file is set");
 							_perConnArr[i]->setSendingFile(true);
 						}
 						else
@@ -659,6 +662,8 @@ void	Server::run(void)
 						// file not hit by revents. mathematically unlikely.
 						_debugMsgI(i, "file not ready yet");
 						_debugMsgI(_tempFdI, "<- file");
+						_debugMsgI(socks[_tempFdI].fd, "<- file's fd");
+						std::cout << socks[_tempFdI].revents << std::endl;
 						continue ;
 					}
 				}

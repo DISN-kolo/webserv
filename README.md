@@ -13,4 +13,4 @@
 
 * ctrl+C in telnet/nc leads to a weird timeout situation? I guess. *Idk if that's an improper termination problem or the server's problem.*
 * sbuf/rbuf above the size of sending produces an infinite do-nothing loop on an always-hitting poll
-* keepalive not functioning in bus size 2
+* keepalive not functioning in bus size 2. seems to be due to polling a file that has a -1 fd for some reason.
