@@ -49,6 +49,7 @@ private:
 	int							_listenSock;
 	std::vector<int>			_listenSocks;
 	std::vector<std::string>	_localRecvBuffers;
+	std::vector<std::string>	_localFWriteBuffers;
 	std::string					_localSendString;
 	std::vector<Connect * >		_perConnArr;
 	int							_reuseAddressValue;

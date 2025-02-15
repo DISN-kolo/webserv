@@ -296,15 +296,15 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		}
 	}
 
-	std::cout << "let's print everything" << std::endl;
-	for (auto it = _head.begin(); it != _head.end(); it++)
-	{
-		std::cout << std::endl;
-		std::cout << "'" << it->first << "'" << std::endl;
-		std::cout << "is..." << std::endl;
-		std::cout << "'" << it->second << "'" << std::endl;
-		std::cout << std::endl;
-	}
+//	std::cout << "let's print everything" << std::endl;
+//	for (auto it = _head.begin(); it != _head.end(); it++)
+//	{
+//		std::cout << std::endl;
+//		std::cout << "'" << it->first << "'" << std::endl;
+//		std::cout << "is..." << std::endl;
+//		std::cout << "'" << it->second << "'" << std::endl;
+//		std::cout << std::endl;
+//	}
 	// k-a managing, part 1
 	helper = _head["connection"];
 	std::string::iterator	itt = helper.begin();

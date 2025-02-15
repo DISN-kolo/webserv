@@ -168,6 +168,10 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
 			_eraseDoubleNlInLocalRecvBuffer(i);
+			_localFWriteBuffers[i] = _localRecvBuffers[i];
+
+			_debugMsgI(i, "local file writing buffer filled with " + _localFWriteBuffers[i]);
+
 			_perConnArr[i]->setWritingFile(true);
 			_tempFdI = i + _connsAmt;
 			socks[_tempFdI].fd = responseObject.getFd();
@@ -299,6 +303,8 @@ void	Server::run(void)
 	char	fileToReadBuf[_sbufSize + 1];
 	// this will store what we read because we shall be able to read in multiple passes before closing the connection.
 	_localRecvBuffers = std::vector<std::string>(_connsAmt, "");
+	// this will store post request strings for them to be written chunk by chunk into the files via poll
+	_localFWriteBuffers = std::vector<std::string>(_connsAmt, "");
 
 	std::cout << "Alright, starting. Ports: " << *(lPorts.begin()) << ".." << *(lPorts.end() - 1) << std::endl;
 	_running = true;
@@ -318,9 +324,8 @@ void	Server::run(void)
 				if (_perConnArr[i] != NULL)
 				{
 					if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
-							&& (!_perConnArr[i]->getStillResponding()))
+							&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getWritingFile()))
 					{
-						_localRecvBuffers[i].clear();
 						_purgeOneConnection(i, socks);
 					}
 				}
@@ -338,9 +343,8 @@ void	Server::run(void)
 			{
 				_debugMsgTimeI(i, curTime);
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
-						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
+						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
 				{
-					_localRecvBuffers[i].clear();
 					_purgeOneConnection(i, socks);
 				}
 			}
@@ -426,22 +430,23 @@ void	Server::run(void)
 								else
 								{
 									_perConnArr[i]->setNeedsBody(false);
-									try
-									{
-										// the try catch is for having a normal response generator, which will be able to throw errors like 502
-										// trim the body here
-//										someMythicalStringThatWillHoldTheBodyForUseByServer = _localRecvBuffers[i].substr(0, _perConnArr[i]->getContLen());
-										ResponseGenerator	responseObject(200);
-
-										_firstTimeSender(&responseObject, socks, i, true, true);
-									}
-									catch (std::exception & e)
-									{
-										_debugMsgI(i, e.what());
-										ResponseGenerator	responseObject(e.what());
-
-										_firstTimeSender(&responseObject, socks, i, true, true);
-									}
+									// same as with retcode > 0, do nothing til the file is done.
+//									try
+//									{
+//										// the try catch is for having a normal response generator, which will be able to throw errors like 502
+//										// trim the body here
+////										someMythicalStringThatWillHoldTheBodyForUseByServer = _localRecvBuffers[i].substr(0, _perConnArr[i]->getContLen());
+//										ResponseGenerator	responseObject(200);
+//
+//										_firstTimeSender(&responseObject, socks, i, true, true);
+//									}
+//									catch (std::exception & e)
+//									{
+//										_debugMsgI(i, e.what());
+//										ResponseGenerator	responseObject(e.what());
+//
+//										_firstTimeSender(&responseObject, socks, i, true, true);
+//									}
 								}
 							} /* okay, it didn't ask for a body... at least yet. maybe it's a head? */
 							else if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
@@ -461,7 +466,6 @@ void	Server::run(void)
 								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									std::cout << "       yup, close it." << std::endl;
-									_localRecvBuffers[i].clear();
 									_purgeOneConnection(i, socks);
 								}
 							}
@@ -470,7 +474,6 @@ void	Server::run(void)
 						{
 							_debugMsgI(i, "Is that some sort of a joke?");
 							_debugMsgI(i, "Nothing in local buf, the read is 0, how tf did we even get polled????");
-							_localRecvBuffers[i].clear();
 							_purgeOneConnection(i, socks);
 						}
 					}
@@ -498,28 +501,30 @@ void	Server::run(void)
 								_debugMsgI(i, "Content size is too big, sending a 400");
 								ResponseGenerator	responseObject("400 Bad Request");
 								_firstTimeSender(&responseObject, socks, i, true, true);
+								// delete the file that's too big TODO
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
-								// TODO write the file or something idk.
-								// TODO maybe close the connection if the keepalive is off type deal?
+								_localFWriteBuffers[i + _connsAmt] += std::string(buf);
 								_perConnArr[i]->setNeedsBody(false);
-								try
-								{
-									// the try catch is for having a normal response generator, which will be able to throw errors like 502
-									ResponseGenerator	responseObject(200);
-									_firstTimeSender(&responseObject, socks, i, true, true);
-								}
-								catch (std::exception & e)
-								{
-									_debugMsgI(i, e.what());
-									ResponseGenerator	responseObject(e.what());
-									_firstTimeSender(&responseObject, socks, i, true, true);
-								}
+								// we don't try to reply here. we only try to reply if we've finished writing the file to the disk.
+//								try
+//								{
+//									// the try catch is for having a normal response generator, which will be able to throw errors like 502
+//									ResponseGenerator	responseObject(200);
+//									_firstTimeSender(&responseObject, socks, i, true, true);
+//								}
+//								catch (std::exception & e)
+//								{
+//									_debugMsgI(i, e.what());
+//									ResponseGenerator	responseObject(e.what());
+//									_firstTimeSender(&responseObject, socks, i, true, true);
+//								}
 							}
 							else
 							{
-								_debugMsgI(i, "Content smaller than expected... continue reading thru the next cycle!!!");
+								_localFWriteBuffers[i + _connsAmt] += std::string(buf);
+								_debugMsgI(i, "Content smaller than expected... continue reading thru the next cycle. Added to local fw buf.");
 							}
 						}
 						else if (_localRecvBuffers[i].find(CRLFCRLF) != std::string::npos ||
@@ -665,6 +670,33 @@ void	Server::run(void)
 				}
 			} /* else if POLLOUT */
 		} /* for to iterate thru socks upon poll's return */
+		// time to iterate thru files!
+		for (int i = _connsAmt; i < _connsAmt * 2; i++)
+		{
+			if (socks[i].fd == -1)
+			{
+				continue ;
+			}
+			if (socks[i].revents == 0)
+			{
+				std::cout << "revents on " << i << " is 0" << std::endl;
+				continue ;
+			}
+			else if (((socks[i].revents & POLLERR) == POLLERR) || ((socks[i].revents & POLLHUP) == POLLHUP) || ((socks[i].revents & POLLNVAL) == POLLNVAL))
+			{
+				_debugMsgI(i, "got an err/hup/val");
+				_purgeOneConnection(i - _connsAmt, socks);
+				continue ;
+			}
+			else if ((socks[i].revents & POLLOUT) == POLLOUT)
+			{
+				if (static_cast<size_t>(_rbufSize) < _localFWriteBuffers[i - _connsAmt].size())
+				{
+					write(socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _rbufSize);
+				}
+				_localRecvBuffers.erase
+			}
+		}
 		std::cout << "                one cycle done!" << std::endl;
 	} /* while (_running) */
 }
