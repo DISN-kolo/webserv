@@ -19,6 +19,7 @@ Connect &Connect::operator=(const Connect & obj)
 	_writingFile = obj.getWritingFile();
 	_fd = obj.getFd();
 	_remainingFileSize = obj.getRemainingFileSize();
+	_serverContext = obj.getServerContext();
 	return (*this);
 }
 
@@ -91,6 +92,11 @@ off_t	Connect::getRemainingFileSize(void) const
 	return (_remainingFileSize);
 }
 
+struct config	Connect::getServerContext(void) const
+{
+	return (_serverContext);
+}
+
 // v for value lol
 void	Connect::setNeedsBody(bool v)
 {
@@ -150,6 +156,11 @@ void	Connect::setFd(int v)
 void	Connect::setRemainingFileSize(off_t v)
 {
 	_remainingFileSize = v;
+}
+
+void	Connect::setServerContext(struct config v)
+{
+	_serverContext = v;
 }
 
 void	Connect::eraseSendStr(size_t pos, size_t len)
