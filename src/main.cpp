@@ -4,6 +4,8 @@ int	main(int argc, char **argv)
 {
 	(void)argc;
 	(void)argv;
+	// evil shit
+	signal(SIGPIPE, SIG_IGN);
 	/*
 	std::map<short, std::string> pe;
 	for (short enumval = 0; enumval < POLLWRBAND*2; enumval++)
