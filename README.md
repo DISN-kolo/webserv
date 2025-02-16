@@ -19,21 +19,21 @@
 
 ### CONFIGURATION FILE
 
-SERVER
-port: mandatory
-host: default 127.0.0.1
-server_name:
-error_page:
-client_max_body_size: default 10MB
-index: default index.html
-root: mandatory
+#### SERVER
+* port: mandatory
+* host: default 127.0.0.1
+* server_name:
+* error_page:
+* client_max_body_size: default 10MB
+* index: default index.html
+* root: mandatory
 
-ROUTE
-allow_methods: default GET
-return:
-name: mandatory
-root: mandatory
-autoindex: default false
-index: default index.html
-cgi_ext: .php
-cgi_path: /bin/php
+#### ROUTE
+* allow_methods: default GET
+* return:
+* name: mandatory
+* root: mandatory
+* autoindex: default false
+* index: default index.html
+* cgi_ext: default .php
+* cgi_path: default /bin/php
