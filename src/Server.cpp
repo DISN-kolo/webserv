@@ -1,20 +1,44 @@
 #include "../inc/Server.hpp"
 
+Server::Server()
+{
+}
+
+unsigned long	Server::_strIpToUL(std::string ip) const
+{
+	unsigned long	res = 0;
+	// since the ip numbers are 100000% only 0..255, there won't be a problem using a regular int...
+	int	helper;
+	int	index = 3;
+	size_t	point = ip.find('.');
+	while (point != std::string::npos)
+	{
+		std::istringstream	iss(ip.substr(0, point));
+		iss >> helper;
+		res += static_cast<unsigned long>(helper);
+		res <<= 8;
+		index--;
+		ip.erase(0, point + 1);
+		point = ip.find('.');
+	}
+	std::istringstream	iss(ip);
+	iss >> helper;
+	res += helper;
+	return (res);
+}
+
 Server::Server(int argc, char** argv)
 {
-	if (argc == 1)
-		_config = new ServerConfig();
-	else if (argc == 2)
-		_config = new ServerConfig(argv[1]);
-	
 	_rbufSize = 4096;
 	_sbufSize = 4096;
-	//_rbufSize = 2;
-	//_sbufSize = 2;
-	//_blogSize = 4096;
-	//_connsAmt = 4096;
 	_blogSize = 4096;
-	_connsAmt = 512;
+	_connsAmt = CONNS_AMT;
+	if (argc == 1)
+		_grandConfig = new ServerConfig();
+	else if (argc == 2)
+		_grandConfig = new ServerConfig(argv[1]);
+
+	// TODO for loop running thru all the _grandConfig items in the _grandConfig object
 	_perConnArr = std::vector<Connect * >(_connsAmt, NULL);
 	_nls.push_back(CRLFCRLF);
 	_nls.push_back(LFCRLF);
@@ -58,13 +82,13 @@ void	Server::_eraseDoubleNlInLocalRecvBuffer(int i)
 	}
 }
 
-int	Server::_checkAvailFdI(pollfd *socks) const
+int	Server::_checkAvailFdI(void) const
 {
 	int	ret = -1;
 	int	i = _lstnN;
 	while (i < _connsAmt)
 	{
-		if (socks[i].fd == -1)
+		if (_socks[i].fd == -1)
 		{
 			ret = i;
 			break ;
@@ -74,19 +98,20 @@ int	Server::_checkAvailFdI(pollfd *socks) const
 	return (ret);
 }
 
-void	Server::_purgeOneConnection(int i, pollfd *socks)
+void	Server::_purgeOneConnection(int i)
 {
 	_localRecvBuffers[i].clear();
-	close(socks[i].fd);
-	socks[i].fd = -1;
+	_localFWriteBuffers[i].clear();
+	close(_socks[i].fd);
+	_socks[i].fd = -1;
 
 	if (_perConnArr[i] != NULL)
 	{
 		_tempFdI = i + _connsAmt;
-		if (socks[_tempFdI].fd != -1)
+		if (_socks[_tempFdI].fd != -1)
 		{
-			close(socks[_tempFdI].fd);
-			socks[_tempFdI].fd = -1;
+			close(_socks[_tempFdI].fd);
+			_socks[_tempFdI].fd = -1;
 			// TODO
 			_debugMsgI(i, "file -1'd; don't forget to unlink/remove it if it's from post and you need it gone");
 		}
@@ -96,15 +121,15 @@ void	Server::_purgeOneConnection(int i, pollfd *socks)
 	}
 }
 
-void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC)
+void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC)
 {
 	// in case of has file being true, the size would be just of the head
 	if (static_cast<size_t>(_sbufSize) < rO->getSize())
 	{
 		_localSendString = rO->getText().substr(0, _sbufSize);
-		send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+		send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
 
-		socks[i].events = POLLOUT;
+		_socks[i].events = POLLOUT;
 		_perConnArr[i]->setSendStr(rO->getText());
 		_perConnArr[i]->eraseSendStr(0, _sbufSize);
 		_perConnArr[i]->setStillResponding(true);
@@ -116,18 +141,18 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool 
 	}
 	else
 	{
-		send(socks[i].fd, rO->getText().c_str(), rO->getSize(), 0);
+		send(_socks[i].fd, rO->getText().c_str(), rO->getSize(), 0);
 		_perConnArr[i]->setStillResponding(false);
 		_debugMsgI(i, "sent in one go:");
 		std::cout << rO->getText() << std::endl;
 		if (_perConnArr[i]->getHasFile())
 		{
-			socks[i].events = POLLOUT;
+			_socks[i].events = POLLOUT;
 			_perConnArr[i]->setSendingFile(true);
 		}
 		else
 		{
-			socks[i].events = POLLIN;
+			_socks[i].events = POLLIN;
 		}
 	}
 	_perConnArr[i]->setTimeStarted(time(NULL));
@@ -144,14 +169,14 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool 
 				&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
 		{
 			// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
-			_purgeOneConnection(i, socks);
+			_purgeOneConnection(i);
 			_debugMsgI(i, "connection purged from firsttime");
-			std::cout << "fd must be -1: " << socks[i].fd << std::endl;
+			std::cout << "fd must be -1: " << _socks[i].fd << std::endl;
 		}
 	}
 }
 
-void	Server::_onHeadLocated(int i, pollfd *socks)
+void	Server::_onHeadLocated(int i)
 {
 	_debugMsgI(i, "Head located. Stop reading for a moment");
 	_debugMsgI(i, "Total msg:");
@@ -180,9 +205,9 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 
 			_perConnArr[i]->setWritingFile(true);
 			_tempFdI = i + _connsAmt;
-			socks[_tempFdI].fd = responseObject.getFd();
-			socks[_tempFdI].events = POLLOUT;
-			// FIXME clean me broooo vvvvvvvvvvvvvvv we don't need the fd variable no more? cuz like it's the socks[i + _connsAmt], always
+			_socks[_tempFdI].fd = responseObject.getFd();
+			_socks[_tempFdI].events = POLLOUT;
+			// FIXME clean me broooo vvvvvvvvvvvvvvv we don't need the fd variable no more? cuz like it's the _socks[i + _connsAmt], always
 			_perConnArr[i]->setFd(responseObject.getFd());
 			// we don't send stuff just yet. 201 created should probably be sent when we're done reading, right?
 			// then, we save the contents of ro to sendstr i think.
@@ -209,12 +234,12 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			{
 				_tempFdI = i + _connsAmt;
 				_perConnArr[i]->setHasFile(true);
-				socks[_tempFdI].fd = responseObject.getFd();
-				socks[_tempFdI].events = POLLIN;
+				_socks[_tempFdI].fd = responseObject.getFd();
+				_socks[_tempFdI].events = POLLIN;
 				_perConnArr[i]->setFd(responseObject.getFd());
 				_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
 			}
-			_firstTimeSender(&responseObject, socks, i, false, true);
+			_firstTimeSender(&responseObject, i, false, true);
 
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
@@ -224,7 +249,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			_perConnArr[i]->setNeedsBody(false);
 			ResponseGenerator	responseObject(200);
 
-			_firstTimeSender(&responseObject, socks, i, false, true);
+			_firstTimeSender(&responseObject, i, false, true);
 
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
@@ -239,49 +264,60 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 		_debugMsgI(i, e.what());
 		ResponseGenerator	responseObject(e.what());
 
-		_firstTimeSender(&responseObject, socks, i, true, true);
+		_firstTimeSender(&responseObject, i, true, true);
 	}
 }
 
 void	Server::run(void)
 {
-	if (!_config->getConfig().size())
+    if (!_config->getConfig().size())
 		return;
-	std::vector<int>	lPorts = _config->getConfig().back().ports;
-	sockaddr_in	addresses[lPorts.size()];
-
-	for (unsigned long i = 0; i < lPorts.size(); i++)
+	// TODO config-compliant remake: make this a double for
+	// 1st for goes thru the servers, since each server has one ip adress
+	// 2nd for goes thru its ports
+	//
+	// the perconnarr contexts for the listen sockets should be set on a per-server basis, since ports don't mean anything in our case
+	for (unsigned long servI = 0; servI < _grandConfig->getConfig().size(); servI++)
 	{
-		// open some abstract socket
-		// and also make it nonblocking
-		_listenSock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-		if (_listenSock < 0)
-			throw socketUnopenedError();
+		struct config	current_conf = _grandConfig->getConfig()[servI];
+		_debugMsgI(servI, "IP registred: " + current_conf.host);
+		for (unsigned long portI = 0; portI < current_conf.ports.size(); portI++)
+		{
+			_debugMsgI(portI, "port registred:");
+			_debugMsgI(current_conf.ports[portI], "<-");
+			sockaddr_in	address;
+			// open some abstract socket
+			// and also make it nonblocking
+			_listenSock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+			if (_listenSock < 0)
+				throw socketUnopenedError();
 
-		// make it reusable
-		_reuseAddressValue = 1;
-		if (setsockopt(_listenSock, SOL_SOCKET, SO_REUSEADDR, &_reuseAddressValue, sizeof(_reuseAddressValue)) < 0)
-			throw sockOptError();
+			// make it reusable
+			_reuseAddressValue = 1;
+			if (setsockopt(_listenSock, SOL_SOCKET, SO_REUSEADDR, &_reuseAddressValue, sizeof(_reuseAddressValue)) < 0)
+				throw sockOptError();
 
-		// make a struct that has the type of the address, the ip, the port
-		std::memset(&(addresses[i]), 0, sizeof (addresses[i]));
-		addresses[i].sin_family = AF_INET;
-		addresses[i].sin_addr.s_addr = htonl(INADDR_ANY);
-		// TODO maybe thru the config not "any" ----^^^
-		// TODO need to make a function to convert a.b.c.d into whatever s_addr is
-		addresses[i].sin_port = htons(lPorts[i]);
-		// make a sock be of a specified address
-		if (bind(_listenSock, (struct sockaddr *)&(addresses[i]), sizeof(addresses[i])) < 0)
-			throw bindError();
+			// make a struct that has the type of the address, the ip, the port
+			std::memset(&(address), 0, sizeof (address));
+			address.sin_family = AF_INET;
+			address.sin_addr.s_addr = htonl(_strIpToUL(current_conf.host));
+			address.sin_port = htons(current_conf.ports[portI]);
+			// make a sock be of a specified address
+			if (bind(_listenSock, (struct sockaddr *)&(address), sizeof(address)) < 0)
+				throw bindError();
 
-		// listen up!
-		if (listen(_listenSock, _blogSize) < 0)
-			throw listenError();
+			// listen up!
+			if (listen(_listenSock, _blogSize) < 0)
+				throw listenError();
 
-		_listenSocks.push_back(_listenSock);
+			_listenSocks.push_back(_listenSock);
+			_perConnArr[_listenSocks.size() - 1] = new Connect;
+			_perConnArr[_listenSocks.size() - 1]->setServerContext(current_conf);
+			_debugMsgI(portI, "one port added successfully");
+		}
 	}
-	// make an array of poll's structs
-	struct pollfd	socks[_connsAmt * 2];
+	std::cout << "escaped" << std::endl;
+	// what's the array of pollfds (_socks)?
 	// looks like (max sizes. keep in mind that we'll be shrinking ts dynamically to help poll iterate thru only
 	//the active fds instead of a mix of fds and -1s)
 	// [0         ...      _lS.size) -- for listening sockets
@@ -293,17 +329,17 @@ void	Server::run(void)
 	//too. because 1 conn = 1 write or 1 read maximum... so who cares, like.....
 	for (int x = 0; x < _connsAmt * 2; x++)
 	{
-		socks[x].fd = -1;
-		socks[x].events = 0;
-		socks[x].revents = 0;
+		_socks[x].fd = -1;
+		_socks[x].events = 0;
+		_socks[x].revents = 0;
 	}
 
 	// setup init listening sock in the array of poll's structs
 	_lstnN = _listenSocks.size();
 	for (int i = 0; i < _lstnN; i++)
 	{
-		socks[i].fd = _listenSocks[i];
-		socks[i].events = POLLIN;
+		_socks[i].fd = _listenSocks[i];
+		_socks[i].events = POLLIN;
 	}
 
 	// _timeout is measured in ms
@@ -318,12 +354,12 @@ void	Server::run(void)
 	_localFWriteBuffers = std::vector<std::string>(_connsAmt, "");
 	_fWCounts = std::vector<size_t>(_connsAmt, 0);
 
-	std::cout << "Alright, starting. Ports: " << *(lPorts.begin()) << ".." << *(lPorts.end() - 1) << std::endl;
+	std::cout << "Alright, starting. Size: " << _lstnN << std::endl;
 	_running = true;
 	time_t	curTime;
 	while (_running)
 	{
-		_retCode = poll(socks, _connsAmt * 2, _timeout);
+		_retCode = poll(_socks, _connsAmt * 2, _timeout);
 		curTime = time(NULL);
 		if (_retCode < 0)
 		{
@@ -338,34 +374,34 @@ void	Server::run(void)
 					if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
 							&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getWritingFile()))
 					{
-						_purgeOneConnection(i, socks);
+						_purgeOneConnection(i);
 					}
 				}
 			}
 		}
 		std::cout << "Just poll'd, ret number is " << _retCode << std::endl;
 
-		// go thru all the socks that could have possibly been affected
+		// go thru all the _socks that could have possibly been affected
 		// see if they've been affected
 		for (int i = 0; i < _connsAmt; i++)
 		{
-			if (socks[i].fd == -1)
+			if (_socks[i].fd == -1)
 				continue ;
-			if (_perConnArr[i] != NULL)
+			if (_perConnArr[i] != NULL && i >= _lstnN)
 			{
 				_debugMsgTimeI(i, curTime);
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < curTime - _perConnArr[i]->getTimeStarted())
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
 				{
-					_purgeOneConnection(i, socks);
+					_purgeOneConnection(i);
 				}
 			}
-			if (socks[i].revents == 0)
+			if (_socks[i].revents == 0)
 			{
 				std::cout << "revents on " << i << " is 0" << std::endl;
 				continue ;
 			}
-			else if (((socks[i].revents & POLLERR) == POLLERR) || ((socks[i].revents & POLLHUP) == POLLHUP) || ((socks[i].revents & POLLNVAL) == POLLNVAL))
+			else if (((_socks[i].revents & POLLERR) == POLLERR) || ((_socks[i].revents & POLLHUP) == POLLHUP) || ((_socks[i].revents & POLLNVAL) == POLLNVAL))
 			{
 				if (i < _lstnN)
 				{
@@ -374,26 +410,27 @@ void	Server::run(void)
 					// XXX ?
 				}
 				_debugMsgI(i, "got an err/hup/val");
-				_purgeOneConnection(i, socks);
+				_purgeOneConnection(i);
 			}
-			else if ((socks[i].revents & POLLIN) == POLLIN)
+			else if ((_socks[i].revents & POLLIN) == POLLIN)
 			{
 				if (i < _lstnN)
 				{
 					// wow is that the listening fd? our sock? yes it is!
-					_connectHereIndex = _checkAvailFdI(socks);
+					_connectHereIndex = _checkAvailFdI();
 					if (_connectHereIndex != -1)
 					{
 						_newConnect = accept(_listenSocks[i], NULL, NULL);
-//						_newConnect = accept(socks[i].fd, NULL, NULL);
+//						_newConnect = accept(_socks[i].fd, NULL, NULL);
 						while (_newConnect > 0)
 						{
 //							_debugMsgI(i, "accepted a connect");
-							socks[_connectHereIndex].fd = _newConnect;
-							socks[_connectHereIndex].events = POLLIN;
+							_socks[_connectHereIndex].fd = _newConnect;
+							_socks[_connectHereIndex].events = POLLIN;
 							_perConnArr[_connectHereIndex] = new Connect;
+							_perConnArr[_connectHereIndex]->setServerContext(_perConnArr[i]->getServerContext());
 //							_debugMsgI(_connectHereIndex, "<-- new connect is situated here");
-							_connectHereIndex = _checkAvailFdI(socks);
+							_connectHereIndex = _checkAvailFdI();
 							if (_connectHereIndex != -1)
 							{
 								_newConnect = accept(_listenSocks[i], NULL, NULL);
@@ -407,14 +444,14 @@ void	Server::run(void)
 				}
 				else
 				{
-//					std::cout << "Descriptior " << socks[i].fd << " at pos " << i << " readable" << std::endl;
+//					std::cout << "Descriptior " << _socks[i].fd << " at pos " << i << " readable" << std::endl;
 					std::memset(buf, 0, sizeof (buf));
-					_retCode = recv(socks[i].fd, buf, _rbufSize, 0);
+					_retCode = recv(_socks[i].fd, buf, _rbufSize, 0);
 					if (_retCode < 0)
 					{
 						// to crash or not to crash? XXX to think
 //						throw readError();
-						_purgeOneConnection(i, socks);
+						_purgeOneConnection(i);
 						std::cout << std::setw(4) << i << " > " << std::flush;
 						std::cout << "_retCode " << _retCode << " but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 					}
@@ -438,7 +475,7 @@ void	Server::run(void)
 									_debugMsgI(i, "Content size is too big, sending a 400");
 									ResponseGenerator	responseObject("400 Bad Request");
 
-									_firstTimeSender(&responseObject, socks, i, true, true);
+									_firstTimeSender(&responseObject, i, true, true);
 								}
 								else
 								{
@@ -451,14 +488,14 @@ void	Server::run(void)
 ////										someMythicalStringThatWillHoldTheBodyForUseByServer = _localRecvBuffers[i].substr(0, _perConnArr[i]->getContLen());
 //										ResponseGenerator	responseObject(200);
 //
-//										_firstTimeSender(&responseObject, socks, i, true, true);
+//										_firstTimeSender(&responseObject, i, true, true);
 //									}
 //									catch (std::exception & e)
 //									{
 //										_debugMsgI(i, e.what());
 //										ResponseGenerator	responseObject(e.what());
 //
-//										_firstTimeSender(&responseObject, socks, i, true, true);
+//										_firstTimeSender(&responseObject, i, true, true);
 //									}
 								}
 							} /* okay, it didn't ask for a body... at least yet. maybe it's a head? */
@@ -467,7 +504,7 @@ void	Server::run(void)
 									_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 									_localRecvBuffers[i].find(LFLF) != std::string::npos)
 							{
-								_onHeadLocated(i, socks);
+								_onHeadLocated(i);
 							}
 							else
 							{
@@ -479,7 +516,7 @@ void	Server::run(void)
 								if (!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 								{
 									std::cout << "       yup, close it." << std::endl;
-									_purgeOneConnection(i, socks);
+									_purgeOneConnection(i);
 								}
 							}
 						}
@@ -487,7 +524,7 @@ void	Server::run(void)
 						{
 							_debugMsgI(i, "Is that some sort of a joke?");
 							_debugMsgI(i, "Nothing in local buf, the read is 0, how tf did we even get polled????");
-							_purgeOneConnection(i, socks);
+							_purgeOneConnection(i);
 						}
 					}
 					else if (_retCode > 0)
@@ -513,7 +550,7 @@ void	Server::run(void)
 								_perConnArr[i]->setNeedsBody(false);
 								_debugMsgI(i, "Content size is too big, sending a 400");
 								ResponseGenerator	responseObject("400 Bad Request");
-								_firstTimeSender(&responseObject, socks, i, true, true);
+								_firstTimeSender(&responseObject, i, true, true);
 								// delete the file that's too big TODO
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
@@ -525,13 +562,13 @@ void	Server::run(void)
 //								{
 //									// the try catch is for having a normal response generator, which will be able to throw errors like 502
 //									ResponseGenerator	responseObject(200);
-//									_firstTimeSender(&responseObject, socks, i, true, true);
+//									_firstTimeSender(&responseObject, i, true, true);
 //								}
 //								catch (std::exception & e)
 //								{
 //									_debugMsgI(i, e.what());
 //									ResponseGenerator	responseObject(e.what());
-//									_firstTimeSender(&responseObject, socks, i, true, true);
+//									_firstTimeSender(&responseObject, i, true, true);
 //								}
 							}
 							else
@@ -545,7 +582,7 @@ void	Server::run(void)
 								_localRecvBuffers[i].find(CRLFLF) != std::string::npos ||
 								_localRecvBuffers[i].find(LFLF) != std::string::npos)
 						{
-							_onHeadLocated(i, socks);
+							_onHeadLocated(i);
 						}
 						else
 						{
@@ -554,7 +591,7 @@ void	Server::run(void)
 					}
 				}
 			} /* else if POLLIN */
-			else if ((socks[i].revents & POLLOUT) == POLLOUT)
+			else if ((_socks[i].revents & POLLOUT) == POLLOUT)
 			{
 				// regular sends (not first sends)
 				// step 1. are we sending a file rn? no? well, just send the string that's saved in the perconarr[i]
@@ -563,7 +600,7 @@ void	Server::run(void)
 					if (static_cast<size_t>(_sbufSize) < _perConnArr[i]->getSendStr().size())
 					{
 						_localSendString = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
-						send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+						send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
 
 						_perConnArr[i]->eraseSendStr(0, _sbufSize);
 
@@ -572,21 +609,21 @@ void	Server::run(void)
 					}
 					else
 					{
-						send(socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
+						send(_socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
 						_perConnArr[i]->setStillResponding(false);
 						_debugMsgI(i, "sent in one go or remaints:");
 						std::cout << _perConnArr[i]->getSendStr() << std::endl;
 						if (_perConnArr[i]->getHasFile())
 						{
 							_debugMsgI(i, "switching to filesending mode");
-							_debugMsgI(socks[i + _connsAmt].fd, "<- file's fd");
-							if (socks[i + _connsAmt].events == POLLIN)
+							_debugMsgI(_socks[i + _connsAmt].fd, "<- file's fd");
+							if (_socks[i + _connsAmt].events == POLLIN)
 								_debugMsgI(i, "pollin on the file is set");
 							_perConnArr[i]->setSendingFile(true);
 						}
 						else
 						{
-							socks[i].events = POLLIN;
+							_socks[i].events = POLLIN;
 						}
 					}
 				}
@@ -596,17 +633,17 @@ void	Server::run(void)
 					_tempFdI = i + _connsAmt;
 					// after finding where the file fd is in the poll's list, we check for its revents. irl, it's probably absolutely always ready
 					// but here we have a subject to abide by :P
-					if (((socks[_tempFdI].revents & POLLERR) == POLLERR)
-							|| ((socks[_tempFdI].revents & POLLHUP) == POLLHUP)
-							|| ((socks[_tempFdI].revents & POLLNVAL) == POLLNVAL))
+					if (((_socks[_tempFdI].revents & POLLERR) == POLLERR)
+							|| ((_socks[_tempFdI].revents & POLLHUP) == POLLHUP)
+							|| ((_socks[_tempFdI].revents & POLLNVAL) == POLLNVAL))
 					{
 						_debugMsgI(i, "while processing the socket,..");
 						_debugMsgI(_tempFdI, "<- its associated file errored.");
 					}
-					else if ((socks[_tempFdI].revents & POLLIN) == POLLIN)
+					else if ((_socks[_tempFdI].revents & POLLIN) == POLLIN)
 					{
 						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
-						_retCode = read(socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
+						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
 						if (_retCode < 0)
 						{
 							// file reading error. this is weird; we should've caught it upon opening the file,
@@ -620,13 +657,13 @@ void	Server::run(void)
 							// we somehow had something from poll but showed up with 0 bytes upon actual reading.
 							// mathematically unlikely, as bob page perfectly put it in the hit videogame deus ex from the year 2000.
 							_debugMsgI(i, "ABSOLUTELY done reading from the asked file. close it up.");
-							close(socks[_tempFdI].fd);
-							socks[_tempFdI].fd = -1;
+							close(_socks[_tempFdI].fd);
+							_socks[_tempFdI].fd = -1;
 
 							_perConnArr[i]->setHasFile(false);
 							_perConnArr[i]->setSendingFile(false);
 							_perConnArr[i]->setStillResponding(false);
-							socks[i].events = POLLIN;
+							_socks[i].events = POLLIN;
 						}
 						else if (_perConnArr[i]->getRemainingFileSize() == _retCode)
 						{
@@ -634,7 +671,7 @@ void	Server::run(void)
 							_debugMsgI(i, "the intended way of finishing reading a file reached.");
 							fileToReadBuf[_retCode] = 0;
 							_localSendString = std::string(fileToReadBuf);
-							send(socks[i].fd, _localSendString.c_str(), _retCode, 0);
+							send(_socks[i].fd, _localSendString.c_str(), _retCode, 0);
 
 							// what's the purpose...
 //							_perConnArr[i]->diminishRemainingFileSize(_sbufSize);
@@ -642,20 +679,20 @@ void	Server::run(void)
 							_debugMsgI(i, "the last f-chunk that was sent:");
 							std::cout << _localSendString << std::endl;
 
-							close(socks[_tempFdI].fd);
-							socks[_tempFdI].fd = -1;
+							close(_socks[_tempFdI].fd);
+							_socks[_tempFdI].fd = -1;
 
 							_perConnArr[i]->setHasFile(false);
 							_perConnArr[i]->setSendingFile(false);
 							_perConnArr[i]->setStillResponding(false);
-							socks[i].events = POLLIN;
+							_socks[i].events = POLLIN;
 						}
 						else
 						{
 							// the "regular". we need to substract the sbuf size from the counter of remaining filesize and send the chunk.
 							fileToReadBuf[_retCode] = 0;
 							_localSendString = std::string(fileToReadBuf);
-							send(socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+							send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
 
 							_perConnArr[i]->diminishRemainingFileSize(_sbufSize);
 
@@ -668,8 +705,8 @@ void	Server::run(void)
 						// file not hit by revents. mathematically unlikely.
 						_debugMsgI(i, "file not ready yet");
 						_debugMsgI(_tempFdI, "<- file");
-						_debugMsgI(socks[_tempFdI].fd, "<- file's fd");
-						std::cout << socks[_tempFdI].revents << std::endl;
+						_debugMsgI(_socks[_tempFdI].fd, "<- file's fd");
+						std::cout << _socks[_tempFdI].revents << std::endl;
 						continue ;
 					}
 				}
@@ -683,40 +720,40 @@ void	Server::run(void)
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
 				{
 					// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
-					_purgeOneConnection(i, socks);
+					_purgeOneConnection(i);
 					_debugMsgI(i, "connection purged in pollout");
 				}
 			} /* else if POLLOUT */
-		} /* for to iterate thru socks upon poll's return */
+		} /* for to iterate thru _socks upon poll's return */
 		// time to iterate thru files!
 		for (int i = _connsAmt; i < _connsAmt * 2; i++)
 		{
-			if (socks[i].fd == -1 || ((socks[i].events & POLLIN) == POLLIN))
+			if (_socks[i].fd == -1 || ((_socks[i].events & POLLIN) == POLLIN))
 			{
 				continue ;
 			}
-			if (socks[i].revents == 0)
+			if (_socks[i].revents == 0)
 			{
 				std::cout << "revents on " << i << " is 0" << std::endl;
 				if ((!_perConnArr[i - _connsAmt]->getKeepAlive() || _perConnArr[i - _connsAmt]->getKaTimeout() < time(NULL) - _perConnArr[i - _connsAmt]->getTimeStarted()))
 				{
 					// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
-					_purgeOneConnection(i - _connsAmt, socks);
+					_purgeOneConnection(i - _connsAmt);
 					_debugMsgI(i, "connection timeouted in filewriting");
 				}
 				continue ;
 			}
-			else if (((socks[i].revents & POLLERR) == POLLERR) || ((socks[i].revents & POLLHUP) == POLLHUP) || ((socks[i].revents & POLLNVAL) == POLLNVAL))
+			else if (((_socks[i].revents & POLLERR) == POLLERR) || ((_socks[i].revents & POLLHUP) == POLLHUP) || ((_socks[i].revents & POLLNVAL) == POLLNVAL))
 			{
 				_debugMsgI(i, "got an err/hup/val");
-				_purgeOneConnection(i - _connsAmt, socks);
+				_purgeOneConnection(i - _connsAmt);
 				continue ;
 			}
-			else if ((socks[i].revents & POLLOUT) == POLLOUT)
+			else if ((_socks[i].revents & POLLOUT) == POLLOUT)
 			{
 				if (static_cast<size_t>(_rbufSize) < _localFWriteBuffers[i - _connsAmt].size())
 				{
-					write(socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _rbufSize);
+					write(_socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _rbufSize);
 					_debugMsgI(i, "wrote an rbuf-sized chunk");
 					_debugMsgI(i, _localFWriteBuffers[i - _connsAmt].substr(0, _rbufSize));
 					_fWCounts[i - _connsAmt] += _rbufSize;
@@ -726,7 +763,7 @@ void	Server::run(void)
 				}
 				else
 				{
-					write(socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _localFWriteBuffers[i - _connsAmt].size());
+					write(_socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _localFWriteBuffers[i - _connsAmt].size());
 					_debugMsgI(i, "wrote a less than rbuf sized chunk");
 					_debugMsgI(i, _localFWriteBuffers[i - _connsAmt]);
 					_fWCounts[i - _connsAmt] += _localFWriteBuffers[i - _connsAmt].size();
@@ -743,10 +780,10 @@ void	Server::run(void)
 //				_debugMsgI(_fWCounts[i - _connsAmt], "<- fdcounts for the file was");
 //				_debugMsgI(_perConnArr[i - _connsAmt]->getContLen(), "<- contlen for the file was");
 				// done. close the file
-				close(socks[i].fd);
-				socks[i].fd = -1;
+				close(_socks[i].fd);
+				_socks[i].fd = -1;
 				// must send the 201 created now
-				socks[i - _connsAmt].events = POLLOUT;
+				_socks[i - _connsAmt].events = POLLOUT;
 				_perConnArr[i - _connsAmt]->setWritingFile(false);
 				_perConnArr[i - _connsAmt]->setNeedsBody(false);
 				_perConnArr[i - _connsAmt]->setStillResponding(true);
@@ -760,15 +797,19 @@ void	Server::run(void)
 			else if ((!_perConnArr[i - _connsAmt]->getKeepAlive() || _perConnArr[i - _connsAmt]->getKaTimeout() < time(NULL) - _perConnArr[i - _connsAmt]->getTimeStarted()))
 			{
 				// maybe, getstillresponding should be removed from this if. we could spend a long time collecting the answer, and we should drop then. maybe.
-				_purgeOneConnection(i - _connsAmt, socks);
+				_purgeOneConnection(i - _connsAmt);
 				_debugMsgI(i, "connection timeouted in filewriting");
 			}
-		} /* for files in socks */
+		} /* for files in _socks */
 		std::cout << "                one cycle done!" << std::endl;
 	} /* while (_running) */
 }
 
 Server::~Server()
 {
-	delete _config;
+	delete _grandConfig;
+	for (size_t i = 0; i < _listenSocks.size(); i++)
+	{
+		delete _perConnArr[i];
+	}
 }

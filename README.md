@@ -3,7 +3,8 @@
 
 ### TODOs
 
-* config implementation merging
+* transform the ips from the config into the proper ips for the listeners. actually, do context for the listeners.
+* transfer some arrays into the "global" space of the server object.
 * CGI
 * binary data ?
 * check out the poll's limits on \_connsAmt. it gives an error if the total polling size is too big... ulimit -n?

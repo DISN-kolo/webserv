@@ -26,26 +26,29 @@
 class Server
 {
 private:
+	Server();
 	Server(const Server & obj);
 	Server &operator=(const Server & obj);
+	unsigned long	_strIpToUL(std::string ip) const;
 
-	int		_checkAvailFdI(pollfd *socks) const;
-	void	_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC);
-	void	_onHeadLocated(int i, pollfd *sock);
+	int		_checkAvailFdI(void) const;
+	void	_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC);
+	void	_onHeadLocated(int i);
 	void	_eraseDoubleNlInLocalRecvBuffer(int i);
-	void	_purgeOneConnection(int i, pollfd* socks);
+	void	_purgeOneConnection(int i);
 
 	void	_debugMsgI(int i, std::string msg);
 	void	_debugMsgTimeI(int i, time_t curTime);
 
-	ServerConfig		*_config;
-	int	_rbufSize;
-	int	_sbufSize;
-	int	_blogSize;
-	int	_connsAmt;
+	ServerConfig	*_grandConfig;
+	int		_rbufSize;
+	int		_sbufSize;
+	int		_blogSize;
+	int		_connsAmt;
 
 
 	// internal variables used for the run function and its subfunctions
+	struct pollfd				_socks[CONNS_AMT * 2];
 	int							_listenSock;
 	std::vector<int>			_listenSocks;
 	std::vector<std::string>	_localRecvBuffers;
