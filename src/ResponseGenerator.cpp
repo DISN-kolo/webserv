@@ -4,6 +4,7 @@ ResponseGenerator::ResponseGenerator()
 {
 }
 
+// more or less a placeholder.
 ResponseGenerator::ResponseGenerator(int code)
 {
 	std::stringstream	ss;
@@ -15,8 +16,95 @@ ResponseGenerator::ResponseGenerator(int code)
 	ss << "Content-Length: " << cont.size() << CRLF;
 	ss << CRLF;
 	ss << cont;
+	// no vvvv ? FIXME remove it?
 	ss << CRLF;
 	_text = ss.str();
+}
+
+ResponseGenerator::ResponseGenerator(const char * ewhat)
+{
+	std::stringstream	ss;
+	std::string	cont = _getErrorPage(std::string(ewhat));
+	ss << "HTTP/1.1 " << ewhat << CRLF;
+	ss << "Date: " << _getDate() << CRLF;
+	ss << "Server: " << _getServerName() << CRLF;
+	ss << "Content-Type: " << _getContentType() << CRLF;
+	ss << "Content-Length: " << cont.size() << CRLF;
+	ss << CRLF;
+	ss << cont;
+	// no vvvv ? FIXME remove it?
+	ss << CRLF;
+	_text = ss.str();
+}
+
+ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
+{
+	// let's say that the location directive is already resolved somewhere prior. here,
+	if (req.getMethod() == "GET")
+	{
+		std::cout << "it's a get of '" << req.getRTarget().c_str() << "'" << std::endl;
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(req.getRTarget().c_str(), &st);
+		if (statResponse == -1)
+		{
+			std::cout << "it's a stat == -1" << std::endl;
+			throw notFound();
+		}
+		if ((st.st_mode & S_IFREG) != S_IFREG)
+		{
+			std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
+			std::cout << st.st_mode << std::endl;
+			throw internalServerError();
+		}
+		_fd = open(req.getRTarget().c_str(), O_RDONLY);
+		if (_fd == -1)
+		{
+			std::cout << "it's an fd == -1" << std::endl;
+			throw internalServerError();
+		}
+
+		_fSize = st.st_size;
+		_hasFile = true;
+		std::cout << "epic! you've just opened a file to READ. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
+
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "200 OK" << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Type: " << _getContentType() << CRLF;
+		ss << "Content-Length: " << _fSize << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+	}
+	else if (req.getMethod() == "POST")
+	{
+		std::cout << "it's a post of '" << req.getRTarget().c_str() << "'" << std::endl;
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(req.getRTarget().c_str(), &st);
+		if (statResponse != -1)
+		{
+			// FIXME update existing file instead? idk lol
+			std::cout << "it's a stat != -1: file exists already. idk" << std::endl;
+			throw internalServerError();
+		}
+		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
+		if (_fd == -1)
+		{
+			std::cout << "it's an fd == -1" << std::endl;
+			throw internalServerError();
+		}
+
+		std::cout << "epic! you've just opened a file to WRITE. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << "." << std::endl;
+
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "201 Created" << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+	}
 }
 
 ResponseGenerator::ResponseGenerator(const ResponseGenerator & obj)
@@ -34,7 +122,7 @@ ResponseGenerator::~ResponseGenerator()
 {
 }
 
-// dummy function.
+// dummy function. TODO
 // real function is probably like:
 // 200? get something that was required.
 // anything else? get a standard eror page OR a page specified by the config.
@@ -49,6 +137,15 @@ std::string	ResponseGenerator::_getContent(int code)
 		return ("A secret third option");
 }
 
+// I beg you, make a map.
+// or not,, that's why it aint a todo lol
+std::string	ResponseGenerator::_getErrorPage(std::string ewhat)
+{
+	std::string	ret;
+	ret = "<head></head><body><p align=\"center\">" + ewhat + "</p></body>";
+	return (ret);
+}
+
 // TODO proably a good idea to make a map of statuses
 std::string	ResponseGenerator::_getStatusMessage(int status)
 {
@@ -56,10 +153,8 @@ std::string	ResponseGenerator::_getStatusMessage(int status)
 	{
 		case 200:
 			return ("OK");
-		case 404:
-			return ("Not Found");
 		default:
-			return ("I'm a teapot");
+			return ("Status code message not implemented.");
 	}
 }
 
@@ -110,4 +205,27 @@ std::string	ResponseGenerator::getText(void) const
 size_t	ResponseGenerator::getSize(void) const
 {
 	return (_text.size());
+//	if (!_hasFile)
+//	{
+//		return (_text.size());
+//	}
+//	else
+//	{
+//		return (_text.size() + _fSize);
+//	}
+}
+
+off_t	ResponseGenerator::getFSize(void) const
+{
+	return (_fSize);
+}
+
+int	ResponseGenerator::getFd(void) const
+{
+	return (_fd);
+}
+
+bool	ResponseGenerator::getHasFile(void) const
+{
+	return (_hasFile);
 }

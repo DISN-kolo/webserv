@@ -4,14 +4,23 @@ SRCNAMES = main.cpp \
 		   exceptions.cpp \
 		   Server.cpp \
 		   ServerConfig.cpp \
-		   ResponseGenerator.cpp
+		   ResponseGenerator.cpp \
+		   RequestHeadParser.cpp \
+		   Connect.cpp
+#		   RequestHeadParser.cpp \
+#		   RequestBodyParser.cpp
 
 SRCS = $(addprefix src/, $(SRCNAMES))
 OBJS = $(addprefix obj/, $(SRCNAMES:.cpp=.o))
 DEPS = $(addprefix obj/, $(SRCNAMES:.cpp=.d))
 
 CC = c++
+
+#CFLAGS = -Wall -Wextra -Werror -std=c++98
 CFLAGS = -Wall -Wextra -Werror -std=c++98 -g -fsanitize=address
+# debug print only
+#CFLAGS = -Wall -Wextra -Werror -std=c++11 -g -fsanitize=address
+
 RM = rm -rf
 
 .PHONY: all clean fclean re

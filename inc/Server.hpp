@@ -4,7 +4,9 @@
 # include "ServerConfig.hpp"
 # include "ResponseGenerator.hpp"
 # include "ServerConfig.hpp"
+# include "RequestHeadParser.hpp"
 # include "webserv.hpp"
+# include "Connect.hpp"
 
 # include <ctime>
 # include <unistd.h>
@@ -16,6 +18,10 @@
 # include <cstdlib>
 # include <cstring>
 # include <csignal>
+/*
+	std::cout << std::setw(4) << i << " > " << std::flush;
+	std::cout << msg << std::endl;
+	*/
 
 class Server
 {
@@ -23,20 +29,43 @@ private:
 	Server(const Server & obj);
 	Server &operator=(const Server & obj);
 
-	ServerConfig		*_config;
+	int		_checkAvailFdI(pollfd *socks) const;
+	void	_firstTimeSender(ResponseGenerator *rO, pollfd *socks, int i, bool clearLRB, bool purgeC);
+	void	_onHeadLocated(int i, pollfd *sock);
+	void	_eraseDoubleNlInLocalRecvBuffer(int i);
+	void	_purgeOneConnection(int i, pollfd* socks);
 
-	// internal variables used for the run function
-	int					_listenSock;
-	std::vector<int>	_listenSocks;
-	int					_reuseAddressValue;
-	int 				_timeout;
-	int					_socksN;
-	int					_lstnN;
-	int					_curSize;
-	bool				_running;
-	int					_newConnect;
-	bool				_compressTheArr;
-	int					_retCode;
+	void	_debugMsgI(int i, std::string msg);
+	void	_debugMsgTimeI(int i, time_t curTime);
+
+	ServerConfig		*_config;
+	// temporary until config is availabe;
+	int	_rbufSize;
+	int	_sbufSize;
+	int	_blogSize;
+	int	_connsAmt;
+
+
+	// internal variables used for the run function and its subfunctions
+	int							_listenSock;
+	std::vector<int>			_listenSocks;
+	std::vector<std::string>	_localRecvBuffers;
+	std::vector<std::string>	_localFWriteBuffers;
+	std::vector<size_t>			_fWCounts;
+	std::string					_localSendString;
+	std::vector<Connect * >		_perConnArr;
+	int							_reuseAddressValue;
+	int 						_timeout;
+	int							_lstnN;
+	bool						_running;
+	int							_connectHereIndex;
+	int							_newConnect;
+	int							_retCode;
+	int							_tempFdI;
+
+	// more specific http parsing helper vars
+	size_t						_nlnl;
+	std::vector<std::string>	_nls;
 public:
 	Server();
 	void	run(void);
