@@ -2,16 +2,13 @@
 
 int	main(int argc, char **argv)
 {
-	ServerConfig	*config = NULL;
-  
-  // evil shit
-	signal(SIGPIPE, SIG_IGN); 
-	try {
+	Server	server(argc, argv);
 
-		if (argc == 1)
-			*config = ServerConfig();
-		else if (argc == 2)
-			*config = ServerConfig(argv[1]);
+	// evil shit
+	signal(SIGPIPE, SIG_IGN); 
+
+	try {
+		server.run();
 	} catch (std::exception &err)
 	{
 		std::cout << err.what() << std::endl;

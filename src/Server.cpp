@@ -1,7 +1,17 @@
 #include "../inc/Server.hpp"
 
-Server::Server()
+Server::Server(int argc, char** argv)
 {
+	try {
+		if (argc == 1)
+			_config = new ServerConfig();
+		else if (argc == 2)
+			_config = new ServerConfig(argv[1]);
+	} catch (std::exception &err)
+	{
+		std::cout << err.what() << std::endl;
+	}
+	
 	_rbufSize = 4096;
 	_sbufSize = 4096;
 	//_rbufSize = 2;
@@ -10,7 +20,6 @@ Server::Server()
 	//_connsAmt = 4096;
 	_blogSize = 4096;
 	_connsAmt = 512;
-	_config = new ServerConfig();
 	_perConnArr = std::vector<Connect * >(_connsAmt, NULL);
 	_nls.push_back(CRLFCRLF);
 	_nls.push_back(LFCRLF);
@@ -241,7 +250,7 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 
 void	Server::run(void)
 {
-	std::vector<int>	lPorts = _config->getPorts();
+	std::vector<int>	lPorts = _config->getConfig().back().ports;
 	sockaddr_in	addresses[lPorts.size()];
 	for (unsigned long i = 0; i < lPorts.size(); i++)
 	{

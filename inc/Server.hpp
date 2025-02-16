@@ -39,7 +39,6 @@ private:
 	void	_debugMsgTimeI(int i, time_t curTime);
 
 	ServerConfig		*_config;
-	// temporary until config is availabe;
 	int	_rbufSize;
 	int	_sbufSize;
 	int	_blogSize;
@@ -67,7 +66,7 @@ private:
 	size_t						_nlnl;
 	std::vector<std::string>	_nls;
 public:
-	Server();
+	Server(int argc, char **argv);
 	void	run(void);
 	~Server();
 } ;

@@ -25,11 +25,10 @@ ServerConfig::~ServerConfig()
 {
 }
 
-std::vector<int>ServerConfig::getPorts()
+std::vector<struct config> ServerConfig::getConfig()
 {
-	return std::vector<int>();
+	return (_config);
 }
-
 
 void	ServerConfig::_parseConfig(const std::string &file)
 {

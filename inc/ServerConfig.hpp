@@ -71,7 +71,8 @@ class ServerConfig
 		ServerConfig(const ServerConfig & obj);
 		ServerConfig &operator=(const ServerConfig & obj);
 		~ServerConfig();
-		std::vector<int>getPorts();
+
+		std::vector<struct config> getConfig();
 } ;
 
 #endif
