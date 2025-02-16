@@ -270,7 +270,7 @@ void	Server::_onHeadLocated(int i)
 
 void	Server::run(void)
 {
-    if (!_config->getConfig().size())
+    if (!_grandConfig->getConfig().size())
 		return;
 	// TODO config-compliant remake: make this a double for
 	// 1st for goes thru the servers, since each server has one ip adress
