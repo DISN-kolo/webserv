@@ -21,7 +21,7 @@
 SERVER
 port: mandatory
 host: default 127.0.0.1
-server_name: mandatory
+server_name:
 error_page:
 client_max_body_size: default 10MB
 index: default index.html
