@@ -2,12 +2,12 @@
 
 ServerConfig::ServerConfig()
 {
-	_parseConfig("config/default.conf");
+	_parseHandler("config/default.conf");
 }
 
 ServerConfig::ServerConfig(const std::string &file)
 {
-	_parseConfig(file);
+	_parseHandler(file);
 }
 
 ServerConfig::ServerConfig(const ServerConfig & obj)
@@ -30,12 +30,23 @@ std::vector<struct config> ServerConfig::getConfig()
 	return (_config);
 }
 
+void	ServerConfig::_parseHandler(const std::string &file)
+{
+	try {
+		_parseConfig(file);
+	} catch (std::exception &err)
+	{
+		std::cout << err.what() << std::endl;
+	}
+}
+
 void	ServerConfig::_parseConfig(const std::string &file)
 {
-	std::ifstream	configFile((file).c_str());
+	std::ifstream	configFile(file.c_str());
 	std::string		line;
 	int				brackets = 0, i = 0;
 	
+	_validateFileExt(file);
 	if (!configFile.is_open())
 		throw configFileException();
 	while (std::getline(configFile, line))
@@ -50,6 +61,25 @@ void	ServerConfig::_parseConfig(const std::string &file)
 	}
 	configFile.close();
 	_validateConfigRequirements();
+}
+
+void	ServerConfig::_validateFileExt(const std::string &file)
+{
+	struct stat	s;
+	int			i = 0;
+
+	while (file[i] && file[i] != '.')
+		i++;
+	if (!file[i] || file.substr(i) != ".conf")
+		throw configFileException();
+	if(stat(file.c_str(),&s) == 0)
+	{
+		if(!(s.st_mode & S_IFREG))
+			throw configFileException();
+	}
+	else
+		throw configFileException();
+
 }
 
 void	ServerConfig::_parseLine(const std::string &line, int &brackets)
@@ -77,7 +107,7 @@ std::string	ServerConfig::_getLine(const std::string &line)
 {
 	int	i = 0, j = 0;
 
-	while (line[i] && std::isspace(line[i]))
+	while (std::isspace(line[i]))
 		i++;
 	while (line[i + j] && line[i + j] != '#')
 		j++;
@@ -95,6 +125,8 @@ std::string	ServerConfig::_getLineKey(const std::string &line)
 
 	while (line[i] && line[i] != ':')
 		i++;
+	if (!line[i])
+		throw configFileLineException();
 	i--;
 	while (i > 0 && std::isspace(line[i]))
 		i--;
@@ -119,7 +151,7 @@ std::string	ServerConfig::_getLineValue(const std::string &value)
 {
 	int	i = 0, j = 0;
 
-	while (value[i] && std::isspace(value[i]))
+	while (std::isspace(value[i]))
 		i++;
 	while (value[i + j])
 		j++;
@@ -214,7 +246,7 @@ void	ServerConfig::_validateBracketClose(const std::string line, int &brackets)
 void	ServerConfig::_validateAutoindex(std::vector<std::string> values, int brackets)
 {
 	bool	autoIndex;
-	if (values.size() != 1 || brackets == 1 || _config.back().routes.back().autoIndexF)
+	if (values.size() != 1 || brackets != 2 || _config.back().routes.back().autoIndexF)
 		throw configFileLineException();
 	if (values[0] == "on")
 		autoIndex = true;
@@ -231,7 +263,7 @@ void	ServerConfig::_validateMaxBody(std::vector<std::string> values, int bracket
 	std::string	u;
 	int			i = 0, n;
 
-	if (values.size() != 1 || brackets == 2 || _config.back().maxBodySize > 0)
+	if (values.size() != 1 || brackets != 1 || _config.back().maxBodySize > 0)
 		throw configFileLineException();
 	while (std::isdigit(values[0][i]))
 		i++;
@@ -253,7 +285,7 @@ void	ServerConfig::_validateHost(std::vector<std::string> values, int brackets)
 	std::string	str;
 	int			n, j = 0;
 
-	if (values.size() != 1 || brackets == 2 || !_config.back().host.empty())
+	if (values.size() != 1 || brackets != 1 || !_config.back().host.empty())
 		throw configFileLineException();
 	std::stringstream			sstr(values[0]);
 	while (getline(sstr, str, '.'))
@@ -275,7 +307,7 @@ void	ServerConfig::_validateHost(std::vector<std::string> values, int brackets)
 
 void	ServerConfig::_validateServerName(std::vector<std::string> values, int brackets)
 {
-	if (values.size() != 1 || brackets == 2 || !_config.back().name.empty())
+	if (values.size() != 1 || brackets != 1 || !_config.back().name.empty())
 		throw configFileLineException();
 	for (int i = 0; values[0][i]; i++)
 	{
@@ -291,8 +323,10 @@ void	ServerConfig::_validateRoot(std::vector<std::string> values, int brackets)
 		throw configFileLineException();
 	if (brackets == 1)
 		_config.back().root = values[0];
-	else
+	else if (brackets == 2)
 		_config.back().routes.back().root = values[0];
+	else 
+		throw configFileLineException();
 }
 
 void	ServerConfig::_validateIndex(std::vector<std::string> values, int brackets)
@@ -301,20 +335,22 @@ void	ServerConfig::_validateIndex(std::vector<std::string> values, int brackets)
 		throw configFileLineException();
 	if (brackets == 1)
 		_config.back().index = values[0];
-	else
+	else if (brackets == 2)
 		_config.back().routes.back().index = values[0];
+	else
+		throw configFileLineException();
 }
 
 void	ServerConfig::_validateName(std::vector<std::string> values, int brackets)
 {
-	if (values.size() != 1 || brackets == 1 || !_config.back().routes.back().name.empty())
+	if (values.size() != 1 || brackets != 2 || !_config.back().routes.back().name.empty())
 		throw configFileLineException();
 	_config.back().routes.back().name = values[0];
 }
 
 void	ServerConfig::_validateReturn(std::vector<std::string> values, int brackets)
 {
-	if (values.size() != 1 || brackets == 1 || !_config.back().routes.back().redir.empty())
+	if (values.size() != 1 || brackets != 2 || !_config.back().routes.back().redir.empty())
 		throw configFileLineException();
 
 	_config.back().routes.back().redir = values[0];
@@ -346,7 +382,7 @@ void	ServerConfig::_validatePort(std::vector<std::string> values, int brackets)
 
 void	ServerConfig::_validateMethods(std::vector<std::string> values, int brackets)
 {
-	if (brackets == 1 || _config.back().routes.back().accMethods.size())
+	if (brackets != 2 || _config.back().routes.back().accMethods.size())
 		throw configFileLineException();
 	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
 	{
@@ -359,21 +395,26 @@ void	ServerConfig::_validateMethods(std::vector<std::string> values, int bracket
 
 void	ServerConfig::_validateCgiPath(std::vector<std::string> values, int brackets)
 {
-	if (brackets == 1 || _config.back().routes.back().cgiPath.size())
+	if (brackets != 2 || _config.back().routes.back().cgiPath.size())
 		throw configFileLineException();
 	_config.back().routes.back().cgiPath = values;
 }
 
 void	ServerConfig::_validateCgiExt(std::vector<std::string> values, int brackets)
 {
-	if (brackets == 1 || _config.back().routes.back().cgiPath.size())
+	if (brackets != 2 || _config.back().routes.back().cgiExt.size())
 		throw configFileLineException();
 	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
 	{
 		if ((*i).length() >= 1 && (*i)[0] != '.')
 			throw configFileLineException();
+		for (int j = 1; (*i)[j]; j++)
+		{
+			if (!std::isalnum((*i)[j]))
+				throw configFileLineException();
+		}
 	}
-	_config.back().routes.back().cgiPath = values;
+	_config.back().routes.back().cgiExt = values;
 }
 
 void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brackets)
@@ -383,7 +424,7 @@ void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brack
 	std::string	errCode, errPath;
 	int			j = 0, n;
 
-	if (brackets == 2 || _config.back().customErrors.size())
+	if (brackets != 1 || _config.back().customErrors.size())
 		throw configFileLineException();
 
 	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)

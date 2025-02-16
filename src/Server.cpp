@@ -33,15 +33,10 @@ Server::Server(int argc, char** argv)
 	_sbufSize = 4096;
 	_blogSize = 4096;
 	_connsAmt = CONNS_AMT;
-	try {
-		if (argc == 1)
-			_grandConfig = new ServerConfig();
-		else if (argc == 2)
-			_grandConfig = new ServerConfig(argv[1]);
-	} catch (std::exception &err)
-	{
-		std::cout << err.what() << std::endl;
-	}
+	if (argc == 1)
+		_grandConfig = new ServerConfig();
+	else if (argc == 2)
+		_grandConfig = new ServerConfig(argv[1]);
 
 	// TODO for loop running thru all the _grandConfig items in the _grandConfig object
 	_perConnArr = std::vector<Connect * >(_connsAmt, NULL);
@@ -275,6 +270,8 @@ void	Server::_onHeadLocated(int i)
 
 void	Server::run(void)
 {
+    if (!_config->getConfig().size())
+		return;
 	// TODO config-compliant remake: make this a double for
 	// 1st for goes thru the servers, since each server has one ip adress
 	// 2nd for goes thru its ports
