@@ -21,6 +21,12 @@ class	configFileBracketsException : public std::exception
 		virtual const char	*what(void) const throw();
 };
 
+class	configFileMissingException : public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	socketUnopenedError : public std::exception
 {
 	public:

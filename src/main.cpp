@@ -8,7 +8,7 @@ int	main(int argc, char **argv)
 	signal(SIGPIPE, SIG_IGN); 
 
 	try {
-		server.run();
+		//server.run();
 	} catch (std::exception &err)
 	{
 		std::cout << err.what() << std::endl;
