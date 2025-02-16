@@ -61,9 +61,9 @@ void	ServerConfig::_parseLine(const std::string &line, int &brackets)
 	validLine = _getLine(line);
 	if (validLine.empty())
 		return;
-	if (validLine == "}")
+	if (validLine[0] == '}')
 	{
-		brackets--;
+		_validateBracketClose(validLine, brackets);
 		return;
 	}
 	if (validLine[validLine.length() - 1] != ';' && validLine[validLine.length() - 1] != '{')
@@ -195,8 +195,10 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 			_validateAlias(values, brackets);
 		else if (key == "cgi_path")
 			_validateCgiPath(values, brackets);
-		else if (key == "cgi_ext")
-			_validateCgiExt(values, brackets);
+		else if (key == "cgi_enabled")
+			_validateCgiEnable(values, brackets);	
+		else if (key == "return")
+			_validateReturn(values, brackets);
 		else
 		{
 			std::cout << "NULL KEY " << key << std::endl;
@@ -209,6 +211,17 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 bool	ServerConfig::_validateChildValue(const std::vector<std::string> values)
 {
 	return (values.size() == 1 && values[0] == "{");
+}
+
+void	ServerConfig::_validateBracketClose(const std::string line, int &brackets)
+{
+	int i = 0;
+
+	while (std::isspace(line[i]))
+		i++;
+	if (line[i] != ';' && line[i] != '}')
+		throw configFileLineException();
+	brackets--;
 }
 
 void	ServerConfig::_validateAutoindex(std::vector<std::string> values, int brackets)
@@ -346,44 +359,86 @@ void	ServerConfig::_validatePort(std::vector<std::string> values, int brackets)
 
 void	ServerConfig::_validateMethods(std::vector<std::string> values, int brackets)
 {
-	std::vector<std::string>	methods;
-	(void) values;
+	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
+	{
+		if (*i != "GET" && *i != "POST" && *i != "DELETE")
+			throw configFileLineException();
+	}
 
 	if (brackets == 1)
-		_config.back().accMethods = methods;
+		_config.back().accMethods = values;
 	else
-		_config.back().routes.back().accMethods = methods;
+		_config.back().routes.back().accMethods = values;
 }
 
 void	ServerConfig::_validateCgiPath(std::vector<std::string> values, int brackets)
 {
-	std::vector<std::string>	paths;
-	(void) values;
-	
 	if (brackets == 1)
-		_config.back().cgiPath = paths;
+		_config.back().cgiPath = values;
 	else
-		_config.back().routes.back().cgiPath = paths;
+		_config.back().routes.back().cgiPath = values;
 }
 
-void	ServerConfig::_validateCgiExt(std::vector<std::string> values, int brackets)
+void	ServerConfig::_validateCgiEnable(std::vector<std::string> values, int brackets)
 {
-	std::vector<std::string>	exts;
-	(void) values;
-	
-	if (brackets == 1)
-		_config.back().cgiEx = exts;
+	bool	enable;
+
+	if (values.size() != 1)
+		throw configFileLineException();
+	if (values[0] == "true")
+		enable = true;
+	else if (values[0] == "false")
+		enable = false;
 	else
-		_config.back().routes.back().cgiEx = exts;
+		throw configFileLineException();
+
+	if (brackets == 1)
+		_config.back().cgiEnable = enable;
+	else
+		_config.back().routes.back().cgiEnable = enable;
+}
+
+void	ServerConfig::_validateReturn(std::vector<std::string> values, int brackets)
+{
+	if (values.size() != 1 || brackets == 1)
+		throw configFileLineException();
+
+	_config.back().routes.back().redir = values[0];
 }
 
 void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brackets)
 {
-	std::vector<std::pair<std::string, std::string> > errors;
-	(void) values;
+	std::vector<std::pair<std::string, std::string> >	errors;
+	std::pair<std::string, std::string>					tmp;
+	std::string	errCode, errPath;
+	int			j = 0, n;
 
 	if (brackets == 2)
 		throw configFileLineException();
+
+	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
+	{
+		if (std::isdigit((*i)[0]))
+		{
+			while ((*i)[j] && !std::isspace((*i)[j]))
+				j++;
+			if (j != 3)
+				throw configFileLineException();
+			errCode = (*i).substr(0, j);
+			n = _stoi(errCode);
+			if (n < 400 || n > 599)
+				throw configFileLineException();
+			tmp.first = errCode;
+			tmp.second = (*i).substr(j + 2);
+		}
+		else
+		{
+			tmp.first = "";
+			tmp.second = *i;
+		}
+		errors.push_back(tmp);
+	}
+
 	_config.back().customErrors = errors;
 }
 

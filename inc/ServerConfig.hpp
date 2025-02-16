@@ -8,12 +8,10 @@
 
 struct routes {
 	std::vector<std::string>	accMethods;
-	std::vector<std::string>	cgiEx;
 	std::vector<std::string>	cgiPath;
-	std::vector<std::string>	cgiFolder;
 	std::string					name;
 	std::string					alias;
-	std::string					redirection;
+	std::string					redir;
 	std::string					root;
 	std::string					index;
 	bool						autoIndex;
@@ -24,9 +22,7 @@ struct routes {
 struct config {
 	std::vector<std::pair<std::string, std::string> >	customErrors;
 	std::vector<std::string>	accMethods;
-	std::vector<std::string>	cgiEx;
 	std::vector<std::string>	cgiPath;
-	std::vector<std::string>	cgiFolder;
 	std::vector<int>			ports;
 	std::string					host;
 	std::string					name;
@@ -50,6 +46,7 @@ class ServerConfig
 		void						_validateConfigValues(const std::string &key, const std::vector<std::string> values, int &brackets);
 
 		bool						_validateChildValue(const std::vector<std::string> values);
+		void						_validateBracketClose(const std::string line, int &brackets);
 		void						_validateAutoindex(std::vector<std::string> values, int brackets);
 		void						_validateMaxBody(std::vector<std::string> values, int brackets);
 		void						_validateHost(std::vector<std::string> values, int brackets);
@@ -61,8 +58,9 @@ class ServerConfig
 		void						_validatePort(std::vector<std::string> values, int brackets);
 		void						_validateMethods(std::vector<std::string> values, int brackets);
 		void						_validateCgiPath(std::vector<std::string> values, int brackets);
-		void						_validateCgiExt(std::vector<std::string> values, int brackets);
+		void						_validateCgiEnable(std::vector<std::string> values, int brackets);
 		void						_validateErrorPage(std::vector<std::string> values, int brackets);
+		void						_validateReturn(std::vector<std::string> values, int brackets);
 
 		int							_stoi(const std::string &str);
 	public:
