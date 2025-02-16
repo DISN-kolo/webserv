@@ -164,9 +164,9 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			// well, yeah iirc...
 			// so this means we won't enter this function anymore I think.
 			// we need to .erase up to the newline x2 mark (inclusive), and start taking in the body
-			_debugMsgI(i, "RO generation started");
+			_debugMsgI(i, "POST RO generation started");
 			ResponseGenerator	responseObject(req);
-			_debugMsgI(i, "RO generated successfully");
+			_debugMsgI(i, "POST RO generated successfully");
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
 			_eraseDoubleNlInLocalRecvBuffer(i);
@@ -197,9 +197,9 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 			// ALSO check out .... file writing! File writing is done via polling, too. No?
 			// ALSO check out .... just sending regular responses might require poll?????? like.... POLLOUT n stuff....... oh my gaaaaaaawddddddddddd
 			_perConnArr[i]->setNeedsBody(false);
-			_debugMsgI(i, "RO generation started");
+			_debugMsgI(i, "GET RO generation started");
 			ResponseGenerator	responseObject(req);
-			_debugMsgI(i, "RO generated successfully");
+			_debugMsgI(i, "GET RO generated successfully");
 			// FIXME we don't need this if if it's always true after a non-throwing response object generation
 			if (responseObject.getHasFile())
 			{
@@ -210,7 +210,6 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 				_perConnArr[i]->setFd(responseObject.getFd());
 				_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
 			}
-
 			_firstTimeSender(&responseObject, socks, i, false, true);
 
 			_eraseDoubleNlInLocalRecvBuffer(i);
@@ -685,7 +684,7 @@ void	Server::run(void)
 		// time to iterate thru files!
 		for (int i = _connsAmt; i < _connsAmt * 2; i++)
 		{
-			if (socks[i].fd == -1)
+			if (socks[i].fd == -1 || ((socks[i].events & POLLIN) == POLLIN))
 			{
 				continue ;
 			}
@@ -733,6 +732,9 @@ void	Server::run(void)
 			}
 			if (_fWCounts[i - _connsAmt] == _perConnArr[i - _connsAmt]->getContLen())
 			{
+//				_debugMsgI(i, "closing the file");
+//				_debugMsgI(_fWCounts[i - _connsAmt], "<- fdcounts for the file was");
+//				_debugMsgI(_perConnArr[i - _connsAmt]->getContLen(), "<- contlen for the file was");
 				// done. close the file
 				close(socks[i].fd);
 				socks[i].fd = -1;
