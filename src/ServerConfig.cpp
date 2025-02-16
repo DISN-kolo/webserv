@@ -39,7 +39,6 @@ void	ServerConfig::_parseConfig(const std::string &file)
 	
 	if (!configFile.is_open())
 		throw configFileException();
-	_config.push_back(config());
 	while (std::getline(configFile, line))
 	{
 		i++;
@@ -51,6 +50,7 @@ void	ServerConfig::_parseConfig(const std::string &file)
 		}
 	}
 	configFile.close();
+	_validateConfigRequirements();
 }
 
 void	ServerConfig::_parseLine(const std::string &line, int &brackets)
@@ -72,14 +72,6 @@ void	ServerConfig::_parseLine(const std::string &line, int &brackets)
 	values = _getLineValues(validLine);
 
 	_validateConfigValues(key, values, brackets);
-
-	/*
-	std::cout << "KEY:" << key << "				";
-	std::cout << "VALUES:";
-	for (size_t i = 0; i < values.size(); i++)
-		std::cout << values[i] << "|";
-	std::cout << "[" << brackets << "]" << std::endl;
-	*/
 }
 
 std::string	ServerConfig::_getLine(const std::string &line)
@@ -151,7 +143,6 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 		if (_validateChildValue(values) && brackets == 0)
 		{
 			_config.push_back(config());
-			_config.back().routes.push_back(routes());
 			brackets++;
 		}
 		else
@@ -440,6 +431,18 @@ void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brack
 	}
 
 	_config.back().customErrors = errors;
+}
+
+void	ServerConfig::_validateConfigRequirements()
+{
+	for (std::vector<struct config>::iterator i = _config.begin(); i != _config.end(); i++)
+	{
+		std::cout << "Server " << i->name << " {" << std::endl;
+		for (std::vector<struct routes>::iterator j = i->routes.begin(); j != i->routes.end(); j++)
+			std::cout << "	Location " << j->name << " { }" << std::endl;
+		std::cout << "}" << std::endl;
+	}
+
 }
 
 int	ServerConfig::_stoi(const std::string &str)

@@ -62,6 +62,8 @@ class ServerConfig
 		void						_validateErrorPage(std::vector<std::string> values, int brackets);
 		void						_validateReturn(std::vector<std::string> values, int brackets);
 
+		void						_validateConfigRequirements();
+
 		int							_stoi(const std::string &str);
 	public:
 		ServerConfig();
