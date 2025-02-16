@@ -16,6 +16,11 @@ const char *configFileBracketsException::what(void) const throw()
 	return ("Config file error: bad brackets");
 }
 
+const char *configFileMissingException::what(void) const throw()
+{
+	return ("Config file error: missing configuration");
+}
+
 
 const char *socketUnopenedError::what(void) const throw()
 {

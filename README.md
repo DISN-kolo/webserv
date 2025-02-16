@@ -15,3 +15,24 @@
 
 * ctrl+C in telnet/nc leads to a weird timeout situation? I guess. *Idk if that's an improper termination problem or the server's problem.*
 * sbuf/rbuf above the size of sending produces an infinite do-nothing loop on an always-hitting poll
+
+### CONFIGURATION FILE
+
+SERVER
+port: mandatory
+host: default 127.0.0.1
+server_name:
+error_page:
+client_max_body_size: default 10MB
+index: default index.html
+root: mandatory
+
+ROUTE
+allow_methods: default GET
+return:
+name: mandatory
+root: mandatory
+autoindex: default false
+index: default index.html
+cgi_ext: .php
+cgi_path: /bin/php
