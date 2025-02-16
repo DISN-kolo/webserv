@@ -55,3 +55,22 @@ const char *pollError::what(void) const throw()
 	return ("Poll error");
 }
 
+const char *badRequest::what(void) const throw()
+{
+	return ("400 Bad Request");
+}
+
+const char *notFound::what(void) const throw()
+{
+	return ("404 Not Found");
+}
+
+const char *lengthRequired::what(void) const throw()
+{
+	return ("411 Length Required");
+}
+
+const char *internalServerError::what(void) const throw()
+{
+	return ("500 Internal Server Error");
+}

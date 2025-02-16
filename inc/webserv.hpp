@@ -2,8 +2,15 @@
 # define MICROSERV_HPP
 
 # include <iostream>
+# include <fstream>
+# include <iomanip>
 # include <map>
 # include <vector>
+# include <algorithm>
+# include <sys/types.h>
+# include <sys/stat.h>
+# include <fcntl.h>
+# include <unistd.h>
 
 /*
 class Server ;
@@ -12,16 +19,24 @@ class ServerConfig ;
 # include "ServerConfig.hpp"
 */
 
+# define KA_TIME 3
 # ifndef CRLF
 #  define CRLF "\r\n"
 # endif
-
-# ifndef RBUF_SIZE
-#  define RBUF_SIZE 32000
+// and now some linebreaks that are apparently valid
+// this one is probably gonna count for LFLF
+# ifndef CRLFLF
+#  define CRLFLF "\r\n\n"
 # endif
-
-# ifndef BLOG_SIZE
-#  define BLOG_SIZE 4096
+# ifndef LFCRLF
+#  define LFCRLF "\n\r\n"
+# endif
+# ifndef LFLF
+#  define LFLF "\n\n"
+# endif
+// this one is probably gonna count for LFCRLF
+# ifndef CRLFCRLF
+#  define CRLFCRLF "\r\n\r\n"
 # endif
 
 # include "exceptions.hpp"

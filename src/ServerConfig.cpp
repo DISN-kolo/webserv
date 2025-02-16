@@ -4,6 +4,9 @@ ServerConfig::ServerConfig()
 	:	_hostname("localhost")
 {
 	_ports.push_back(9000);
+	_ports.push_back(9001);
+	_ports.push_back(9002);
+	_ports.push_back(9003);
 }
 
 ServerConfig::ServerConfig(const ServerConfig & obj)
