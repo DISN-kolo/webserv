@@ -2,15 +2,10 @@
 
 Server::Server(int argc, char** argv)
 {
-	try {
-		if (argc == 1)
-			_config = new ServerConfig();
-		else if (argc == 2)
-			_config = new ServerConfig(argv[1]);
-	} catch (std::exception &err)
-	{
-		std::cout << err.what() << std::endl;
-	}
+	if (argc == 1)
+		_config = new ServerConfig();
+	else if (argc == 2)
+		_config = new ServerConfig(argv[1]);
 	
 	_rbufSize = 4096;
 	_sbufSize = 4096;
@@ -250,8 +245,11 @@ void	Server::_onHeadLocated(int i, pollfd *socks)
 
 void	Server::run(void)
 {
+	if (!_config->getConfig().size())
+		return;
 	std::vector<int>	lPorts = _config->getConfig().back().ports;
 	sockaddr_in	addresses[lPorts.size()];
+
 	for (unsigned long i = 0; i < lPorts.size(); i++)
 	{
 		// open some abstract socket

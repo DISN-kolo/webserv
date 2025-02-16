@@ -35,6 +35,7 @@ class ServerConfig
 {
 	private:
 		std::vector<struct config>	_config;
+		void						_parseHandler(const std::string &file);
 		void						_parseConfig(const std::string &file);
 		void						_parseLine(const std::string &line, int &brackets);
 		std::string					_getLine(const std::string &line);
@@ -44,6 +45,7 @@ class ServerConfig
 		void						_validateConfigValues(const std::string &key, const std::vector<std::string> values, int &brackets);
 
 		bool						_validateChildValue(const std::vector<std::string> values);
+		void						_validateFileExt(const std::string &file);
 		void						_validateBracketClose(const std::string line, int &brackets);
 		void						_validateAutoindex(std::vector<std::string> values, int brackets);
 		void						_validateMaxBody(std::vector<std::string> values, int brackets);
