@@ -3,6 +3,7 @@
 
 ### TODOs
 
+* CGI check for while true (add a timeout to cgi itself)
 * transform the ips from the config into the proper ips for the listeners. actually, do context for the listeners.
 * transfer some arrays into the "global" space of the server object.
 * CGI
