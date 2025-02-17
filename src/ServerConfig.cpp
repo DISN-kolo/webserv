@@ -183,7 +183,7 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 	{
 		if (_validateChildValue(values) && brackets == 1)
 		{
-			_config.back().routes.push_back(config_location_t());
+			_config.back().locations.push_back(config_location_t());
 			brackets++;
 		}
 		else
@@ -246,7 +246,7 @@ void	ServerConfig::_validateBracketClose(const std::string line, int &brackets)
 void	ServerConfig::_validateAutoindex(std::vector<std::string> values, int brackets)
 {
 	bool	autoIndex;
-	if (values.size() != 1 || brackets != 2 || _config.back().routes.back().autoIndexF)
+	if (values.size() != 1 || brackets != 2 || _config.back().locations.back().autoIndexF)
 		throw configFileLineException();
 	if (values[0] == "on")
 		autoIndex = true;
@@ -254,8 +254,8 @@ void	ServerConfig::_validateAutoindex(std::vector<std::string> values, int brack
 		autoIndex = false;
 	else
 		throw configFileLineException();
-	_config.back().routes.back().autoIndexF = true;
-	_config.back().routes.back().autoIndex = autoIndex;
+	_config.back().locations.back().autoIndexF = true;
+	_config.back().locations.back().autoIndex = autoIndex;
 }
 
 void	ServerConfig::_validateMaxBody(std::vector<std::string> values, int brackets)
@@ -319,41 +319,41 @@ void	ServerConfig::_validateServerName(std::vector<std::string> values, int brac
 
 void	ServerConfig::_validateRoot(std::vector<std::string> values, int brackets)
 {
-	if (values.size() != 1 || (brackets == 1 && !_config.back().root.empty()) || (brackets == 2 && !_config.back().routes.back().root.empty()))
+	if (values.size() != 1 || (brackets == 1 && !_config.back().root.empty()) || (brackets == 2 && !_config.back().locations.back().root.empty()))
 		throw configFileLineException();
 	if (brackets == 1)
 		_config.back().root = values[0];
 	else if (brackets == 2)
-		_config.back().routes.back().root = values[0];
+		_config.back().locations.back().root = values[0];
 	else 
 		throw configFileLineException();
 }
 
 void	ServerConfig::_validateIndex(std::vector<std::string> values, int brackets)
 {
-	if (values.size() != 1 || (brackets == 1 && !_config.back().index.empty()) || (brackets == 2 && !_config.back().routes.back().index.empty()))
+	if (values.size() != 1 || (brackets == 1 && !_config.back().index.empty()) || (brackets == 2 && !_config.back().locations.back().index.empty()))
 		throw configFileLineException();
 	if (brackets == 1)
 		_config.back().index = values[0];
 	else if (brackets == 2)
-		_config.back().routes.back().index = values[0];
+		_config.back().locations.back().index = values[0];
 	else
 		throw configFileLineException();
 }
 
 void	ServerConfig::_validateName(std::vector<std::string> values, int brackets)
 {
-	if (values.size() != 1 || brackets != 2 || !_config.back().routes.back().name.empty())
+	if (values.size() != 1 || brackets != 2 || !_config.back().locations.back().name.empty())
 		throw configFileLineException();
-	_config.back().routes.back().name = values[0];
+	_config.back().locations.back().name = values[0];
 }
 
 void	ServerConfig::_validateReturn(std::vector<std::string> values, int brackets)
 {
-	if (values.size() != 1 || brackets != 2 || !_config.back().routes.back().redir.empty())
+	if (values.size() != 1 || brackets != 2 || !_config.back().locations.back().redir.empty())
 		throw configFileLineException();
 
-	_config.back().routes.back().redir = values[0];
+	_config.back().locations.back().redir = values[0];
 }
 
 
@@ -382,7 +382,7 @@ void	ServerConfig::_validatePort(std::vector<std::string> values, int brackets)
 
 void	ServerConfig::_validateMethods(std::vector<std::string> values, int brackets)
 {
-	if (brackets != 2 || _config.back().routes.back().accMethods.size())
+	if (brackets != 2 || _config.back().locations.back().accMethods.size())
 		throw configFileLineException();
 	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
 	{
@@ -390,19 +390,19 @@ void	ServerConfig::_validateMethods(std::vector<std::string> values, int bracket
 			throw configFileLineException();
 	}
 
-	_config.back().routes.back().accMethods = values;
+	_config.back().locations.back().accMethods = values;
 }
 
 void	ServerConfig::_validateCgiPath(std::vector<std::string> values, int brackets)
 {
-	if (brackets != 2 || _config.back().routes.back().cgiPath.size())
+	if (brackets != 2 || _config.back().locations.back().cgiPath.size())
 		throw configFileLineException();
-	_config.back().routes.back().cgiPath = values;
+	_config.back().locations.back().cgiPath = values;
 }
 
 void	ServerConfig::_validateCgiExt(std::vector<std::string> values, int brackets)
 {
-	if (brackets != 2 || _config.back().routes.back().cgiExt.size())
+	if (brackets != 2 || _config.back().locations.back().cgiExt.size())
 		throw configFileLineException();
 	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
 	{
@@ -414,7 +414,7 @@ void	ServerConfig::_validateCgiExt(std::vector<std::string> values, int brackets
 				throw configFileLineException();
 		}
 	}
-	_config.back().routes.back().cgiExt = values;
+	_config.back().locations.back().cgiExt = values;
 }
 
 void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brackets)
@@ -465,7 +465,7 @@ void	ServerConfig::_validateConfigRequirements()
 			i->index = "index.html";
 		if (!(i->maxBodySize > 0))
 			i->maxBodySize = 10 * 1024 * 1024;
-		for (std::vector<struct config_location_t>::iterator j = i->routes.begin(); j != i->routes.end(); j++)
+		for (std::vector<struct config_location_t>::iterator j = i->locations.begin(); j != i->locations.end(); j++)
 		{
 			if (j->name.empty() || i->root.empty())
 				throw configFileMissingException();
@@ -475,6 +475,8 @@ void	ServerConfig::_validateConfigRequirements()
 				j->cgiExt.push_back(".php");
 			if (!j->cgiPath.size())
 				j->cgiPath.push_back("/bin/php");
+			if (j->index.empty())
+				j->index = "index.html";
 		}
 	}
 }
