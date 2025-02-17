@@ -25,7 +25,7 @@ ServerConfig::~ServerConfig()
 {
 }
 
-std::vector<struct config> ServerConfig::getConfig()
+std::vector<struct config_server_t> ServerConfig::getConfig()
 {
 	return (_config);
 }
@@ -173,7 +173,7 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 	{
 		if (_validateChildValue(values) && brackets == 0)
 		{
-			_config.push_back(config());
+			_config.push_back(config_server_t());
 			brackets++;
 		}
 		else
@@ -183,7 +183,7 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 	{
 		if (_validateChildValue(values) && brackets == 1)
 		{
-			_config.back().routes.push_back(routes());
+			_config.back().routes.push_back(config_location_t());
 			brackets++;
 		}
 		else
@@ -455,7 +455,7 @@ void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brack
 
 void	ServerConfig::_validateConfigRequirements()
 {
-	for (std::vector<struct config>::iterator i = _config.begin(); i != _config.end(); i++)
+	for (std::vector<struct config_server_t>::iterator i = _config.begin(); i != _config.end(); i++)
 	{
 		if (!i->ports.size() || i->root.empty())
 			throw configFileMissingException();
@@ -465,7 +465,7 @@ void	ServerConfig::_validateConfigRequirements()
 			i->index = "index.html";
 		if (!(i->maxBodySize > 0))
 			i->maxBodySize = 10 * 1024 * 1024;
-		for (std::vector<struct routes>::iterator j = i->routes.begin(); j != i->routes.end(); j++)
+		for (std::vector<struct config_location_t>::iterator j = i->routes.begin(); j != i->routes.end(); j++)
 		{
 			if (j->name.empty() || i->root.empty())
 				throw configFileMissingException();

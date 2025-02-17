@@ -92,7 +92,7 @@ off_t	Connect::getRemainingFileSize(void) const
 	return (_remainingFileSize);
 }
 
-struct config	Connect::getServerContext(void) const
+struct config_server_t	Connect::getServerContext(void) const
 {
 	return (_serverContext);
 }
@@ -158,7 +158,7 @@ void	Connect::setRemainingFileSize(off_t v)
 	_remainingFileSize = v;
 }
 
-void	Connect::setServerContext(struct config v)
+void	Connect::setServerContext(struct config_server_t v)
 {
 	_serverContext = v;
 }

@@ -6,7 +6,7 @@
 # include <fstream>
 # include <sstream>
 
-struct routes {
+struct config_location_t {
 	std::vector<std::string>	accMethods;
 	std::string					redir;
 	std::string					name;
@@ -19,7 +19,7 @@ struct routes {
 	bool						autoIndexF;
 };
 
-struct config {
+struct config_server_t {
 	std::vector<int>			ports;
 	std::string					host;
 	std::string					name;
@@ -28,13 +28,13 @@ struct config {
 	std::string					index;
 	std::string					root;
 
-	std::vector<struct routes>	routes;
+	std::vector<struct config_location_t>	routes;
 };
 
 class ServerConfig
 {
 	private:
-		std::vector<struct config>	_config;
+		std::vector<struct config_server_t>	_config;
 		void						_parseHandler(const std::string &file);
 		void						_parseConfig(const std::string &file);
 		void						_parseLine(const std::string &line, int &brackets);
@@ -71,7 +71,7 @@ class ServerConfig
 		ServerConfig &operator=(const ServerConfig & obj);
 		~ServerConfig();
 
-		std::vector<struct config> getConfig();
+		std::vector<struct config_server_t> getConfig();
 } ;
 
 #endif

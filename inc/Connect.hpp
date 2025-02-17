@@ -29,7 +29,7 @@ private:
 	bool			_writingFile;
 	int				_fd;
 	off_t			_remainingFileSize;
-	struct config	_serverContext;
+	struct config_server_t	_serverContext;
 public:
 	Connect();
 	~Connect();
@@ -46,7 +46,7 @@ public:
 	bool			getWritingFile(void) const;
 	int				getFd(void) const;
 	off_t			getRemainingFileSize(void) const;
-	struct config	getServerContext(void) const;
+	struct config_server_t	getServerContext(void) const;
 
 	void			setNeedsBody(bool v);
 	void			setContLen(size_t v);
@@ -60,7 +60,7 @@ public:
 	void			setWritingFile(bool v);
 	void			setFd(int v);
 	void			setRemainingFileSize(off_t v);
-	void			setServerContext(struct config v);
+	void			setServerContext(struct config_server_t v);
 
 	void		eraseSendStr(size_t pos, size_t len);
 	void		diminishRemainingFileSize(int amt);

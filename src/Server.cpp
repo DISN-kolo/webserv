@@ -279,7 +279,7 @@ void	Server::run(void)
 	// the perconnarr contexts for the listen sockets should be set on a per-server basis, since ports don't mean anything in our case
 	for (unsigned long servI = 0; servI < _grandConfig->getConfig().size(); servI++)
 	{
-		struct config	current_conf = _grandConfig->getConfig()[servI];
+		struct config_server_t	current_conf = _grandConfig->getConfig()[servI];
 		_debugMsgI(servI, "IP registred: " + current_conf.host);
 		for (unsigned long portI = 0; portI < current_conf.ports.size(); portI++)
 		{
