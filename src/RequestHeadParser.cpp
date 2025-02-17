@@ -123,10 +123,10 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 	}
 }
 
-RequestHeadParser::RequestHeadParser(std::string r)
+RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t server)
 	:	_r(r)
 {
-	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
+//	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
 	_contLen = 0;
 	// bare minimum as per subject
 	_acceptableMethods.push_back("GET ");
@@ -137,6 +137,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	_head["keep-alive"] = "";
 	_head["content-length"] = "";
 	// who cares
+	// well maybe we need it actually. for raw data TODO ? test more with curl
 //	_head["content-type"] = "";
 	// now THIS might be important. or not
 //	_head["content-encoding"] = "";
@@ -219,12 +220,68 @@ RequestHeadParser::RequestHeadParser(std::string r)
 
 	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	_pathDeobfuscator();
-	// check config for rules of "index / default index" TODO
-	if (_rTarget == std::string("/"))
+	bool pathFoundInLocs = false;
+	for (std::vector<struct config_location_t>::iterator it = server.routes.begin(); it != server.routes.end(); it++)
 	{
-		_rTarget += "index.html";
+		// if the name of the location is at the very front of the target,...
+		if (_rTarget.find(it->name) == 0)
+		{
+			std::cout << "the starting point of the path is found to be " << it->name << std::endl;
+			// ...replace it with the root of the location.
+			_rTarget.erase(0, it->name.size());
+			// XXX for now, relativize the root in the location. might be changed soon XXX
+			_rTarget = server.root + "/" + it->root + "/" + _rTarget;
+			// first, check if the result is a directory or not.
+			struct stat	st;
+			int			statResponse;
+			statResponse = stat(_rTarget.c_str(), &st);
+			// there's nothing here lol
+			if (statResponse == -1)
+			{
+				std::cout << "stat gave -1" << std::endl;
+				throw notFound();
+			}
+			// ok, it's a directory, add an index file to it, if autoindex is off
+			if ((st.st_mode & S_IFDIR) == S_IFDIR)
+			{
+				std::cout << "it's a dir, add an index where needed: " << it->autoIndex << std::endl;
+				if (it->autoIndex == false)
+				{
+					std::cout << "adding an index '" << it->index << "'" << std::endl;
+					_rTarget += "/" + it->index;
+				}
+				else if (_method == "GET")
+				{
+					std::cout << "AUTOINDEX MEEEEEEEEEEEEEE" << std::endl;
+					// autoindex is about making a cool page that lists dirs.
+//					_generateDirListing(); // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+				}
+			}
+			// it's a file? even better, do nothing. or, maybe, a cgi
+			// TODO cgi checker here?
+			pathFoundInLocs = true;
+			break ;
+		}
 	}
-	_rTarget = _defaultContentPath + _rTarget;
+	if (!pathFoundInLocs)
+	{
+		std::cout << "path not found in locs. constructing from root" << std::endl;
+		_rTarget = server.root + "/" + _rTarget;
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(_rTarget.c_str(), &st);
+		// there's nothing here lol
+		if (statResponse == -1)
+		{
+			throw notFound();
+		}
+		// ok, it's a directory, add an index file to it, if autoindex is off
+		if ((st.st_mode & S_IFDIR) == S_IFDIR)
+		{
+			_rTarget += "/" + server.index;
+		}
+		// TODO cgi checker here?
+	}
 	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
 
 	// amazing, first line parsed.

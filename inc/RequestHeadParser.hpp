@@ -1,6 +1,7 @@
 #ifndef REQUEST_HEAD_PARSER_HPP
 # define REQUEST_HEAD_PARSER_HPP
 # include "webserv.hpp"
+# include "ServerConfig.hpp"
 # include <sstream>
 # include <iostream>
 # include <string>
@@ -35,7 +36,7 @@ private:
 	void	_pathDeobfuscator(void);
 	char	_hexToAscii(size_t i) const;
 public:
-	RequestHeadParser(std::string r);
+	RequestHeadParser(std::string r, struct config_server_t server);
 	~RequestHeadParser();
 
 	std::map<std::string, std::string>	getHead(void) const;

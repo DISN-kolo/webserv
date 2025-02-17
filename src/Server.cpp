@@ -184,7 +184,7 @@ void	Server::_onHeadLocated(int i)
 	// in case RHP fails; keep-alive is the default for http 1.1
 	try
 	{
-		RequestHeadParser		req(_localRecvBuffers[i]);
+		RequestHeadParser		req(_localRecvBuffers[i], _perConnArr[i]->getServerContext());
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
 		if (req.getMethod() == "POST")
