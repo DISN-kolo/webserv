@@ -21,10 +21,12 @@ ResponseGenerator::ResponseGenerator(int code)
 	_text = ss.str();
 }
 
-ResponseGenerator::ResponseGenerator(const char * ewhat)
+// this is for errors only. thus we need to check if any of the errors are actually like pre-made pages.
+// for that, we need context
+ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t server)
 {
 	std::stringstream	ss;
-	std::string	cont = _getErrorPage(std::string(ewhat));
+	std::string	cont = _getErrorPage(std::string(ewhat), server);
 	ss << "HTTP/1.1 " << ewhat << CRLF;
 	ss << "Date: " << _getDate() << CRLF;
 	ss << "Server: " << _getServerName() << CRLF;
@@ -139,7 +141,7 @@ std::string	ResponseGenerator::_getContent(int code)
 
 // I beg you, make a map.
 // or not,, that's why it aint a todo lol
-std::string	ResponseGenerator::_getErrorPage(std::string ewhat)
+std::string	ResponseGenerator::_getErrorPage(std::string ewhat, struct config_server_t server)
 {
 	std::string	ret;
 	ret = "<head></head><body><p align=\"center\">" + ewhat + "</p></body>";

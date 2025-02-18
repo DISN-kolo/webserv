@@ -3,6 +3,7 @@
 
 ### TODOs
 
+* content-location: http:// ip : port /rtarget (true rtarget btw)
 * CGI
 * CGI check for while true (add a timeout to cgi itself)
 * binary data ?

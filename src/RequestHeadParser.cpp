@@ -38,7 +38,7 @@ char	RequestHeadParser::_hexToAscii(size_t i) const
 // what a name lol.
 // resolves the %XX stuff into ascii
 // resolves the ../../../../.. situations into presentable paths (can't go above
-// the server's "/"
+// the server's "/")
 // adds the <location-thing-path>/ to the front
 void	RequestHeadParser::_pathDeobfuscator(void)
 {
