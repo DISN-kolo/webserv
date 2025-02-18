@@ -221,7 +221,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	_pathDeobfuscator();
 	bool pathFoundInLocs = false;
-	for (std::vector<struct config_location_t>::iterator it = server.routes.begin(); it != server.routes.end(); it++)
+	for (std::vector<struct config_location_t>::iterator it = server.locations.begin(); it != server.locations.end(); it++)
 	{
 		// if the name of the location is at the very front of the target,...
 		if (_rTarget.find(it->name) == 0)
