@@ -28,7 +28,7 @@ struct config_server_t {
 	std::string					index;
 	std::string					root;
 
-	std::vector<struct config_location_t>	routes;
+	std::vector<struct config_location_t>	locations;
 };
 
 class ServerConfig
