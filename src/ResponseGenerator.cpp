@@ -25,18 +25,81 @@ ResponseGenerator::ResponseGenerator(int code)
 // for that, we need context
 ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t server)
 {
-	std::stringstream	ss;
-	std::string	cont = _getErrorPage(std::string(ewhat), server);
-	ss << "HTTP/1.1 " << ewhat << CRLF;
-	ss << "Date: " << _getDate() << CRLF;
-	ss << "Server: " << _getServerName() << CRLF;
-	ss << "Content-Type: " << _getContentType() << CRLF;
-	ss << "Content-Length: " << cont.size() << CRLF;
-	ss << CRLF;
-	ss << cont;
-	// no vvvv ? FIXME remove it?
-	ss << CRLF;
-	_text = ss.str();
+	std::string	errFilePath = "";
+	std::string	errDirPath = "";
+	bool		errFileMatched = false;
+	bool		errDirMatched = false;
+	std::string	numericCode = std::string(ewhat);
+	numericCode = numericCode.substr(0, 3);
+	std::cout << "numeric code gotten: '" << numericCode << "'" << std::endl;
+	// go thru the config's custom errors. search for the path.
+	for (size_t i = 0; i < server.customErrors.size(); i++)
+	{
+		std::cout << "| " << server.customErrors[i].first << " | " << server.customErrors[i].second << " |" << std::endl;
+		if (server.customErrors[i].first == numericCode)
+		{
+			errFilePath = server.customErrors[i].second;
+			errFileMatched = true;
+			break ;
+		}
+		else if (server.customErrors[i].first == "")
+		{
+			errDirPath = server.customErrors[i].second;
+			errDirMatched = true;
+		}
+	}
+	if (errFileMatched || errDirMatched)
+	{
+		if (!errFileMatched)
+		{
+			errFilePath = errDirPath + "/" + numericCode + ".html";
+		}
+		std::cout << "it's an error type \"get\" of '" << errFilePath << "'" << std::endl;
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(errFilePath.c_str(), &st);
+		if (statResponse == -1)
+		{
+			// no file. send the regular thing.
+			std::cout << "it's a stat == -1" << std::endl;
+			_defaultErrorPageGenerator(ewhat);
+			return ;
+		}
+		if ((st.st_mode & S_IFREG) != S_IFREG)
+		{
+			// not a correct kind of file. send the regular thing.
+			std::cout << "it's a s_ifreg != s_ifreg" << std::endl;
+			_defaultErrorPageGenerator(ewhat);
+			return ;
+		}
+		_fd = open(errFilePath.c_str(), O_RDONLY);
+		if (_fd == -1)
+		{
+			// regular open failed, great. send the regular thing.
+			std::cout << "it's an fd == -1" << std::endl;
+			_defaultErrorPageGenerator(ewhat);
+			return ;
+		}
+
+		_fSize = st.st_size;
+		_hasFile = true;
+		std::cout << "error file opened for reading at fd " << _fd << ", and the size is " << _fSize << "." << std::endl;
+
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << ewhat << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Type: " << _getContentType() << CRLF;
+		ss << "Content-Length: " << _fSize << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+	}
+	else
+	{
+		_hasFile = false;
+		std::cout << "absolutely default error page initiated" << std::endl;
+		_defaultErrorPageGenerator(ewhat);
+	}
 }
 
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
@@ -124,6 +187,21 @@ ResponseGenerator::~ResponseGenerator()
 {
 }
 
+void	ResponseGenerator::_defaultErrorPageGenerator(const char * ewhat)
+{
+	std::stringstream	ss;
+	std::string	cont = "<body><p align=\"center\">" + std::string(ewhat) + "</p></body>";
+	ss << "HTTP/1.1 " << ewhat << CRLF;
+	ss << "Date: " << _getDate() << CRLF;
+	ss << "Server: " << _getServerName() << CRLF;
+	ss << "Content-Type: " << _getContentType() << CRLF;
+	ss << "Content-Length: " << cont.size() << CRLF;
+	ss << CRLF;
+	ss << cont;
+	ss << CRLF;
+	_text = ss.str();
+}
+
 // dummy function. TODO
 // real function is probably like:
 // 200? get something that was required.
@@ -137,15 +215,6 @@ std::string	ResponseGenerator::_getContent(int code)
 		return ("<head align=\"center\">404 Not Found</head>");
 	else
 		return ("A secret third option");
-}
-
-// I beg you, make a map.
-// or not,, that's why it aint a todo lol
-std::string	ResponseGenerator::_getErrorPage(std::string ewhat, struct config_server_t server)
-{
-	std::string	ret;
-	ret = "<head></head><body><p align=\"center\">" + ewhat + "</p></body>";
-	return (ret);
 }
 
 // TODO proably a good idea to make a map of statuses

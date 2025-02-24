@@ -15,8 +15,8 @@ private:
 	ResponseGenerator(const ResponseGenerator & obj);
 	ResponseGenerator &operator=(const ResponseGenerator & obj);
 
+	void	_defaultErrorPageGenerator(const char * ewhat);
 	std::string	_getContent(int code);
-	std::string	_getErrorPage(std::string ewhat, struct config_server_t server);
 	std::string	_getStatusMessage(int status);
 	std::string	_getDate(void);
 	std::string	_getServerName(void);

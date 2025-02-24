@@ -262,7 +262,16 @@ void	Server::_onHeadLocated(int i)
 		_perConnArr[i]->setSendingFile(false);
 		_perConnArr[i]->setNeedsBody(false);
 		_debugMsgI(i, e.what());
-		ResponseGenerator	responseObject(e.what());
+		ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
+		if (responseObject.getHasFile())
+		{
+			_tempFdI = i + _connsAmt;
+			_perConnArr[i]->setHasFile(true);
+			_socks[_tempFdI].fd = responseObject.getFd();
+			_socks[_tempFdI].events = POLLIN;
+			_perConnArr[i]->setFd(responseObject.getFd());
+			_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
+		}
 
 		_firstTimeSender(&responseObject, i, true, true);
 	}
@@ -473,7 +482,16 @@ void	Server::run(void)
 								{
 									_perConnArr[i]->setNeedsBody(false);
 									_debugMsgI(i, "Content size is too big, sending a 400");
-									ResponseGenerator	responseObject("400 Bad Request");
+									ResponseGenerator	responseObject("400 Bad Request", _perConnArr[i]->getServerContext());
+								if (responseObject.getHasFile())
+								{
+									_tempFdI = i + _connsAmt;
+									_perConnArr[i]->setHasFile(true);
+									_socks[_tempFdI].fd = responseObject.getFd();
+									_socks[_tempFdI].events = POLLIN;
+									_perConnArr[i]->setFd(responseObject.getFd());
+									_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
+								}
 
 									_firstTimeSender(&responseObject, i, true, true);
 								}
@@ -549,7 +567,16 @@ void	Server::run(void)
 							{
 								_perConnArr[i]->setNeedsBody(false);
 								_debugMsgI(i, "Content size is too big, sending a 400");
-								ResponseGenerator	responseObject("400 Bad Request");
+								ResponseGenerator	responseObject("400 Bad Request", _perConnArr[i]->getServerContext());
+								if (responseObject.getHasFile())
+								{
+									_tempFdI = i + _connsAmt;
+									_perConnArr[i]->setHasFile(true);
+									_socks[_tempFdI].fd = responseObject.getFd();
+									_socks[_tempFdI].events = POLLIN;
+									_perConnArr[i]->setFd(responseObject.getFd());
+									_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
+								}
 								_firstTimeSender(&responseObject, i, true, true);
 								// delete the file that's too big TODO
 							}
@@ -639,6 +666,8 @@ void	Server::run(void)
 					{
 						_debugMsgI(i, "while processing the socket,..");
 						_debugMsgI(_tempFdI, "<- its associated file errored.");
+						_purgeOneConnection(i);
+						continue ;
 					}
 					else if ((_socks[_tempFdI].revents & POLLIN) == POLLIN)
 					{
