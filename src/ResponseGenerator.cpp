@@ -151,6 +151,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		if (statResponse != -1)
 		{
 			// FIXME update existing file instead? idk lol
+			// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
 			std::cout << "it's a stat != -1: file exists already. idk" << std::endl;
 			throw internalServerError();
 		}
@@ -167,6 +168,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		ss << "HTTP/1.1 " << "201 Created" << CRLF;
 		ss << "Date: " << _getDate() << CRLF;
 		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Location: " << req.getUrl() << CRLF;
 		ss << CRLF;
 		_text = ss.str();
 	}

@@ -35,6 +35,9 @@ private:
 	time_t	_kaTimeout;
 	void	_pathDeobfuscator(void);
 	char	_hexToAscii(size_t i) const;
+
+	// for content-location purposes in the response
+	std::string	_url;
 public:
 	RequestHeadParser(std::string r, struct config_server_t server);
 	~RequestHeadParser();
@@ -48,5 +51,7 @@ public:
 
 	bool		getKeepAlive(void) const;
 	time_t		getKaTimeout(void) const;
+
+	std::string	getUrl(void) const;
 } ;
 #endif

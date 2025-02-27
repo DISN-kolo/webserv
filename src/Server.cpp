@@ -200,6 +200,7 @@ void	Server::_onHeadLocated(int i)
 			_perConnArr[i]->setContLen(req.getContLen());
 			_eraseDoubleNlInLocalRecvBuffer(i);
 			_localFWriteBuffers[i] = _localRecvBuffers[i];
+			_localRecvBuffers[i].clear();
 
 			_debugMsgI(i, "local file writing buffer filled with " + _localFWriteBuffers[i]);
 
@@ -258,9 +259,7 @@ void	Server::_onHeadLocated(int i)
 	{
 		// TODO specific server errors (if it's a malloc error, just send a 500 or something. check by making all our server errors of the same sub-class or something.)
 		_debugMsgI(i, "caught something");
-		_perConnArr[i]->setHasFile(false);
-		_perConnArr[i]->setSendingFile(false);
-		_perConnArr[i]->setNeedsBody(false);
+		_cleanAfterCatching(i);
 		_debugMsgI(i, e.what());
 		ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
 		if (responseObject.getHasFile())
@@ -277,11 +276,20 @@ void	Server::_onHeadLocated(int i)
 	}
 }
 
+void	Server::_cleanAfterCatching(int i)
+{
+	close(_perConnArr[i]->getFd());
+	_socks[i + _connsAmt].fd = -1;
+	_perConnArr[i]->setSendStr("");
+	_perConnArr[i]->setHasFile(false);
+	_perConnArr[i]->setSendingFile(false);
+	_perConnArr[i]->setNeedsBody(false);
+}
+
 void	Server::run(void)
 {
     if (!_grandConfig->getConfig().size())
 		return;
-	// TODO config-compliant remake: make this a double for
 	// 1st for goes thru the servers, since each server has one ip adress
 	// 2nd for goes thru its ports
 	//
@@ -322,6 +330,7 @@ void	Server::run(void)
 			_listenSocks.push_back(_listenSock);
 			_perConnArr[_listenSocks.size() - 1] = new Connect;
 			_perConnArr[_listenSocks.size() - 1]->setServerContext(current_conf);
+			_perConnArr[_listenSocks.size() - 1]->setPortInUse(current_conf.ports[portI]);
 			_debugMsgI(portI, "one port added successfully");
 		}
 	}
@@ -480,18 +489,18 @@ void	Server::run(void)
 								std::cout << "content-length for this one is supposed to be " << _perConnArr[i]->getContLen() << "..." << std::endl;
 								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 								{
-									_perConnArr[i]->setNeedsBody(false);
+									_cleanAfterCatching(i);
 									_debugMsgI(i, "Content size is too big, sending a 400");
 									ResponseGenerator	responseObject("400 Bad Request", _perConnArr[i]->getServerContext());
-								if (responseObject.getHasFile())
-								{
-									_tempFdI = i + _connsAmt;
-									_perConnArr[i]->setHasFile(true);
-									_socks[_tempFdI].fd = responseObject.getFd();
-									_socks[_tempFdI].events = POLLIN;
-									_perConnArr[i]->setFd(responseObject.getFd());
-									_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
-								}
+									if (responseObject.getHasFile())
+									{
+										_tempFdI = i + _connsAmt;
+										_perConnArr[i]->setHasFile(true);
+										_socks[_tempFdI].fd = responseObject.getFd();
+										_socks[_tempFdI].events = POLLIN;
+										_perConnArr[i]->setFd(responseObject.getFd());
+										_perConnArr[i]->setRemainingFileSize(responseObject.getFSize());
+									}
 
 									_firstTimeSender(&responseObject, i, true, true);
 								}
@@ -565,7 +574,7 @@ void	Server::run(void)
 						{
 							if (_localRecvBuffers[i].size() > _perConnArr[i]->getContLen())
 							{
-								_perConnArr[i]->setNeedsBody(false);
+								_cleanAfterCatching(i);
 								_debugMsgI(i, "Content size is too big, sending a 400");
 								ResponseGenerator	responseObject("400 Bad Request", _perConnArr[i]->getServerContext());
 								if (responseObject.getHasFile())
@@ -789,10 +798,17 @@ void	Server::run(void)
 					_localFWriteBuffers[i - _connsAmt].erase(0, _rbufSize);
 					_debugMsgI(i, "remains after erasing:");
 					_debugMsgI(i, _localFWriteBuffers[i - _connsAmt]);
+					_perConnArr[i - _connsAmt]->setTimeStarted(time(NULL));
+					_debugMsgI(i, "reset starting time");
 				}
 				else
 				{
 					write(_socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _localFWriteBuffers[i - _connsAmt].size());
+					if (_localFWriteBuffers[i - _connsAmt].size() > 0)
+					{
+						_perConnArr[i - _connsAmt]->setTimeStarted(time(NULL));
+						_debugMsgI(i, "reset starting time");
+					}
 					_debugMsgI(i, "wrote a less than rbuf sized chunk");
 					_debugMsgI(i, _localFWriteBuffers[i - _connsAmt]);
 					_fWCounts[i - _connsAmt] += _localFWriteBuffers[i - _connsAmt].size();
@@ -800,8 +816,6 @@ void	Server::run(void)
 				}
 				_debugMsgI(i, "total fwcount is..");
 				std::cout << _fWCounts[i - _connsAmt] << std::endl;
-				_perConnArr[i - _connsAmt]->setTimeStarted(time(NULL));
-				_debugMsgI(i, "reset starting time");
 			}
 			if (_fWCounts[i - _connsAmt] == _perConnArr[i - _connsAmt]->getContLen())
 			{

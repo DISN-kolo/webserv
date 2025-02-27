@@ -19,7 +19,7 @@ class ServerConfig ;
 # include "ServerConfig.hpp"
 */
 
-# define KA_TIME 5
+# define KA_TIME 500
 # define CONNS_AMT 512
 # ifndef CRLF
 #  define CRLF "\r\n"

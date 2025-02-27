@@ -126,6 +126,8 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t server)
 	:	_r(r)
 {
+	std::ostringstream	urlss;
+	urlss << "http://" + server.host + ":" << server.ports[0] << "/";
 //	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
 	_contLen = 0;
 	// bare minimum as per subject
@@ -220,6 +222,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 
 	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	_pathDeobfuscator();
+	// _rTarget changed. connect it to the url string for the content-location stuff
+	urlss << _rTarget;
+	_url = urlss.str();
 	bool pathFoundInLocs = false;
 	for (std::vector<struct config_location_t>::iterator it = server.locations.begin(); it != server.locations.end(); it++)
 	{
@@ -239,22 +244,33 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			if (statResponse == -1)
 			{
 				std::cout << "stat gave -1" << std::endl;
-				throw notFound();
+				if (_method == "GET" || _method == "DELETE")
+				{
+					throw notFound();
+				}
 			}
 			// ok, it's a directory, add an index file to it, if autoindex is off
 			if ((st.st_mode & S_IFDIR) == S_IFDIR)
 			{
 				std::cout << "it's a dir, add an index where needed: " << it->autoIndex << std::endl;
-				if (it->autoIndex == false)
+				if (_method == "GET")
 				{
-					std::cout << "adding an index '" << it->index << "'" << std::endl;
-					_rTarget += "/" + it->index;
+					if (it->autoIndex == false)
+					{
+						std::cout << "adding an index '" << it->index << "'" << std::endl;
+						_rTarget += "/" + it->index;
+					}
+					else
+					{
+						std::cout << "AUTOINDEX MEEEEEEEEEEEEEE" << std::endl;
+						// autoindex is about making a cool page that lists dirs.
+//						_generateDirListing(); // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+					}
 				}
-				else if (_method == "GET")
+				else
 				{
-					std::cout << "AUTOINDEX MEEEEEEEEEEEEEE" << std::endl;
-					// autoindex is about making a cool page that lists dirs.
-//					_generateDirListing(); // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+					// you can't just post a file over a dictionary which exists already
+					throw internalServerError();
 				}
 			}
 			// it's a file? even better, do nothing. or, maybe, a cgi
@@ -273,16 +289,27 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		// there's nothing here lol
 		if (statResponse == -1)
 		{
-			throw notFound();
+			if (_method == "GET" || _method == "DELETE")
+			{
+				throw notFound();
+			}
 		}
 		// ok, it's a directory, add an index file to it, if autoindex is off
 		if ((st.st_mode & S_IFDIR) == S_IFDIR)
 		{
-			_rTarget += "/" + server.index;
+			if (_method == "GET")
+			{
+				_rTarget += "/" + server.index;
+			}
+			else
+			{
+				throw internalServerError();
+			}
 		}
 		// TODO cgi checker here?
 	}
 	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
+
 
 	// amazing, first line parsed.
 	// now, 1. get next line
@@ -454,4 +481,9 @@ bool		RequestHeadParser::getKeepAlive(void) const
 time_t		RequestHeadParser::getKaTimeout(void) const
 {
 	return (_kaTimeout);
+}
+
+std::string	RequestHeadParser::getUrl(void) const
+{
+	return (_url);
 }

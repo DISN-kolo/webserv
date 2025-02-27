@@ -179,3 +179,9 @@ void	Connect::diminishRemainingFileSize(int amt)
 		_remainingFileSize -= amt;
 	}
 }
+
+void	Connect::setPortInUse(int port)
+{
+	_serverContext.ports.clear();
+	_serverContext.ports.push_back(port);
+}
