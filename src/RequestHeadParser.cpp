@@ -164,8 +164,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	}
 	if (it == _acceptableMethods.end())
 	{
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "Method not found in acceptable list" << std::endl;
+#endif
 		// TODO maybe 501?
 		throw badRequest();
 	}
@@ -176,8 +180,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	//               GET sp   /  sp HTTP/1.1
 	if (line.size() < 3 + 1 + 1 + 1 + 8)
 	{
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "This first line is way too short" << std::endl;
+#endif
 		throw badRequest();
 	}
 
@@ -187,8 +195,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	{
 		if (line.find("HTTP/1.0\r", line.size() - std::string("HTTP/1.0\r").size()) == std::string::npos)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Bad protocol" << std::endl;
+#endif
 			throw badRequest();
 		}
 		else
@@ -213,8 +225,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 		else if (wcount >= 3)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Too many words in Start Line" << std::endl;
+#endif
 			throw badRequest();
 		}
 		wcount++;
@@ -231,7 +247,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		// if the name of the location is at the very front of the target,...
 		if (_rTarget.find(it->name) == 0)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "the starting point of the path is found to be " << it->name << std::endl;
+#endif
 			// ...replace it with the root of the location.
 			_rTarget.erase(0, it->name.size());
 			// XXX for now, relativize the root in the location. might be changed soon XXX
@@ -243,7 +261,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			// there's nothing here lol
 			if (statResponse == -1)
 			{
+#ifdef DEBUG_SERVER_MESSAGES
 				std::cout << "stat gave -1" << std::endl;
+#endif
 				if (_method == "GET" || _method == "DELETE")
 				{
 					throw notFound();
@@ -252,17 +272,23 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			// ok, it's a directory, add an index file to it, if autoindex is off
 			if ((st.st_mode & S_IFDIR) == S_IFDIR)
 			{
+#ifdef DEBUG_SERVER_MESSAGES
 				std::cout << "it's a dir, add an index where needed: " << it->autoIndex << std::endl;
+#endif
 				if (_method == "GET")
 				{
 					if (it->autoIndex == false)
 					{
+#ifdef DEBUG_SERVER_MESSAGES
 						std::cout << "adding an index '" << it->index << "'" << std::endl;
+#endif
 						_rTarget += "/" + it->index;
 					}
 					else
 					{
+#ifdef DEBUG_SERVER_MESSAGES
 						std::cout << "AUTOINDEX MEEEEEEEEEEEEEE" << std::endl;
+#endif
 						// autoindex is about making a cool page that lists dirs.
 //						_generateDirListing(); // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 					}
@@ -281,7 +307,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	}
 	if (!pathFoundInLocs)
 	{
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "path not found in locs. constructing from root" << std::endl;
+#endif
 		_rTarget = server.root + "/" + _rTarget;
 		struct stat	st;
 		int			statResponse;
@@ -308,7 +336,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 		// TODO cgi checker here?
 	}
+#ifdef DEBUG_SERVER_MESSAGES
 	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
+#endif
 
 
 	// amazing, first line parsed.
@@ -328,21 +358,33 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		pos = line.find(":");
 		if (pos == std::string::npos)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Didn't find a colon in '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 			throw badRequest();
 		}
 		helper = line.substr(0, pos);
 		if (helper.size() <= 1)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Semicolon encountered without field name? on '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 			throw badRequest();
 		}
 		if (helper.find(" ") != std::string::npos)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Spaces in field name on '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 			throw badRequest();
 		}
 		std::string::iterator	itt = helper.begin();
@@ -361,7 +403,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			// sorry croski but it's straight to the next field.
 			if (line.find("\r") == line.size() - 1)
 			{
+#ifdef DEBUG_SERVER_MESSAGES
 				std::cout << "\\r located on position " << line.find("\r") << std::endl;
+#endif
 				_head[helper] = line.substr(pos + 1, line.size() - 2 - pos);
 			}
 			else
@@ -376,19 +420,35 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 		else
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Unknown line found: '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 		}
 	}
 
+	//	#ifdef DEBUG_SERVER_MESSAGES
 //	std::cout << "let's print everything" << std::endl;
+//	#endif
 //	for (auto it = _head.begin(); it != _head.end(); it++)
 //	{
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << "'" << it->first << "'" << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << "is..." << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << "'" << it->second << "'" << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << std::endl;
+//		#endif
 //	}
 	// k-a managing, part 1
 	helper = _head["connection"];
@@ -437,8 +497,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		cls >> _contLen;
 		if (cls.fail() || cls.peek() > 0)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << _contLen << std::endl;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "     > " << "Content length '" << _head["content-length"] << "' found to be bad" << std::endl;
+#endif
 			throw badRequest();
 		}
 	}
