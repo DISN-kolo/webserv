@@ -3,7 +3,7 @@
 
 ### TODOs
 
-* deleting files. both with DELETE and with having a wrong file written
+* DELETE
 * CGI
 * CGI check for while true (add a timeout to cgi itself)
 * binary data ?
