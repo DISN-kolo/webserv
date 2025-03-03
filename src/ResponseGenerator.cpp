@@ -118,8 +118,21 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 	}
 }
 
-ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
+ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server)
 {
+	_server = server;
+	if (req.getRedirection())
+	{
+		_hasFile = false;
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "308 Permanent Redirect" << CRLF;
+		ss << "Location: " << req.getRedirLoc() << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+		return ;
+	}
 	// let's say that the location directive is already resolved somewhere prior. here,
 	if (req.getMethod() == "GET")
 	{
@@ -344,6 +357,10 @@ std::string	ResponseGenerator::_getDate(void)
 // needs to access the config file for the servname.
 std::string	ResponseGenerator::_getServerName(void)
 {
+	if (!(_server.name.empty()))
+	{
+		return (_server.name);
+	}
 	return ("localhost");
 }
 

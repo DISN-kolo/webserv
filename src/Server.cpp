@@ -217,7 +217,7 @@ void	Server::_onHeadLocated(int i)
 			// so this means we won't enter this function anymore I think.
 			// we need to .erase up to the newline x2 mark (inclusive), and start taking in the body
 			_debugMsgI(i, "POST RO generation started");
-			ResponseGenerator	responseObject(req);
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
 			_debugMsgI(i, "POST RO generated successfully");
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
@@ -252,7 +252,7 @@ void	Server::_onHeadLocated(int i)
 			// ALSO check out .... just sending regular responses might require poll?????? like.... POLLOUT n stuff....... oh my gaaaaaaawddddddddddd
 			_perConnArr[i]->setNeedsBody(false);
 			_debugMsgI(i, "GET RO generation started");
-			ResponseGenerator	responseObject(req);
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
 			_debugMsgI(i, "GET RO generated successfully");
 			// FIXME we don't need this if if it's always true after a non-throwing response object generation
 			if (responseObject.getHasFile())
@@ -273,7 +273,7 @@ void	Server::_onHeadLocated(int i)
 			// this is DELETE.... obviously, TODO. not implemented yet at all
 			_perConnArr[i]->setNeedsBody(false);
 			_debugMsgI(i, "DELETE (RO too lol) started");
-			ResponseGenerator	responseObject(req);
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
 			_debugMsgI(i, "DELETE SUCCESS");
 
 			_firstTimeSender(&responseObject, i, false, true);

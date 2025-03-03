@@ -26,10 +26,12 @@ private:
 	off_t		_fSize;
 	int			_fd;
 	bool		_hasFile;
+
+	struct config_server_t	_server;
 public:
 	ResponseGenerator(int code);
 	ResponseGenerator(const char * ewhat, struct config_server_t server);
-	ResponseGenerator(const RequestHeadParser & req);
+	ResponseGenerator(const RequestHeadParser & req, struct config_server_t server);
 	~ResponseGenerator();
 
 	std::string	getText(void) const;

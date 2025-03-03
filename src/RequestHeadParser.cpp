@@ -126,6 +126,7 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t server)
 	:	_r(r)
 {
+	_redirection = false;
 	std::ostringstream	urlss;
 	urlss << "http://" + server.host + ":" << server.ports[0] << "/";
 //	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
@@ -253,7 +254,10 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			/// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
 			if (!(it->redir.empty()))
 			{
-				// TODO XXX stopped here
+				_redirection = true;
+				std::ostringstream	redirss;
+				redirss << "http://" << server.host << ":" << server.ports[0] << "/" << it->redir;
+				_redirLoc = redirss.str();
 				return ;
 			}
 			// ...replace it with the root of the location.
@@ -558,4 +562,14 @@ time_t		RequestHeadParser::getKaTimeout(void) const
 std::string	RequestHeadParser::getUrl(void) const
 {
 	return (_url);
+}
+
+bool		RequestHeadParser::getRedirection(void) const
+{
+	return (_redirection);
+}
+
+std::string	RequestHeadParser::getRedirLoc(void) const
+{
+	return (_redirLoc);
 }
