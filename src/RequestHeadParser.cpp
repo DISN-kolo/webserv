@@ -250,6 +250,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "the starting point of the path is found to be " << it->name << std::endl;
 #endif
+			/// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
+			if (!(it->redir.empty()))
+			{
+				// TODO XXX stopped here
+				return ;
+			}
 			// ...replace it with the root of the location.
 			_rTarget.erase(0, it->name.size());
 			// XXX for now, relativize the root in the location. might be changed soon XXX

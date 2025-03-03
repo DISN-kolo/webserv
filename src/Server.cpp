@@ -560,7 +560,7 @@ void	Server::run(void)
 									// same as with retcode > 0, do nothing til the file is done.
 //									try
 //									{
-//										// the try catch is for having a normal response generator, which will be able to throw errors like 502
+//										// the try catch is for having a normal response generator, which will be able to throw errors like 500
 //										// trim the body here
 ////										someMythicalStringThatWillHoldTheBodyForUseByServer = _localRecvBuffers[i].substr(0, _perConnArr[i]->getContLen());
 //										ResponseGenerator	responseObject(200);
