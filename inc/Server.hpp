@@ -36,6 +36,7 @@ private:
 	void	_onHeadLocated(int i);
 	void	_eraseDoubleNlInLocalRecvBuffer(int i);
 	void	_purgeOneConnection(int i);
+	void	_cleanAfterCatching(int i);
 
 	void	_debugMsgI(int i, std::string msg);
 	void	_debugMsgTimeI(int i, time_t curTime);
