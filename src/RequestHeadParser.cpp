@@ -38,7 +38,7 @@ char	RequestHeadParser::_hexToAscii(size_t i) const
 // what a name lol.
 // resolves the %XX stuff into ascii
 // resolves the ../../../../.. situations into presentable paths (can't go above
-// the server's "/"
+// the server's "/")
 // adds the <location-thing-path>/ to the front
 void	RequestHeadParser::_pathDeobfuscator(void)
 {
@@ -123,10 +123,12 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 	}
 }
 
-RequestHeadParser::RequestHeadParser(std::string r)
+RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t server)
 	:	_r(r)
 {
-	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
+	std::ostringstream	urlss;
+	urlss << "http://" + server.host + ":" << server.ports[0] << "/";
+//	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
 	_contLen = 0;
 	// bare minimum as per subject
 	_acceptableMethods.push_back("GET ");
@@ -137,6 +139,7 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	_head["keep-alive"] = "";
 	_head["content-length"] = "";
 	// who cares
+	// well maybe we need it actually. for raw data TODO ? test more with curl
 //	_head["content-type"] = "";
 	// now THIS might be important. or not
 //	_head["content-encoding"] = "";
@@ -161,8 +164,12 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	}
 	if (it == _acceptableMethods.end())
 	{
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "Method not found in acceptable list" << std::endl;
+#endif
 		// TODO maybe 501?
 		throw badRequest();
 	}
@@ -173,8 +180,12 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	//               GET sp   /  sp HTTP/1.1
 	if (line.size() < 3 + 1 + 1 + 1 + 8)
 	{
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "This first line is way too short" << std::endl;
+#endif
 		throw badRequest();
 	}
 
@@ -184,8 +195,12 @@ RequestHeadParser::RequestHeadParser(std::string r)
 	{
 		if (line.find("HTTP/1.0\r", line.size() - std::string("HTTP/1.0\r").size()) == std::string::npos)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Bad protocol" << std::endl;
+#endif
 			throw badRequest();
 		}
 		else
@@ -210,8 +225,12 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		}
 		else if (wcount >= 3)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Too many words in Start Line" << std::endl;
+#endif
 			throw badRequest();
 		}
 		wcount++;
@@ -219,13 +238,116 @@ RequestHeadParser::RequestHeadParser(std::string r)
 
 	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	_pathDeobfuscator();
-	// check config for rules of "index / default index" TODO
-	if (_rTarget == std::string("/"))
+	// _rTarget changed. connect it to the url string for the content-location stuff
+	urlss << _rTarget;
+	_url = urlss.str();
+	bool pathFoundInLocs = false;
+	for (std::vector<struct config_location_t>::iterator it = server.locations.begin(); it != server.locations.end(); it++)
 	{
-		_rTarget += "index.html";
+		// if the name of the location is at the very front of the target,...
+		if (_rTarget.find(it->name) == 0)
+		{
+#ifdef DEBUG_SERVER_MESSAGES
+			std::cout << "the starting point of the path is found to be " << it->name << std::endl;
+#endif
+			/// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
+			if (!(it->redir.empty()))
+			{
+				// TODO XXX stopped here
+				return ;
+			}
+			// ...replace it with the root of the location.
+			_rTarget.erase(0, it->name.size());
+			// XXX for now, relativize the root in the location. might be changed soon XXX
+			_rTarget = server.root + "/" + it->root + "/" + _rTarget;
+			// first, check if the result is a directory or not.
+			struct stat	st;
+			int			statResponse;
+			statResponse = stat(_rTarget.c_str(), &st);
+			// there's nothing here lol
+			if (statResponse == -1)
+			{
+#ifdef DEBUG_SERVER_MESSAGES
+				std::cout << "stat gave -1" << std::endl;
+#endif
+				if (_method == "GET" || _method == "DELETE")
+				{
+					throw notFound();
+				}
+			}
+			// ok, it's a directory, add an index file to it, if autoindex is off
+			if ((st.st_mode & S_IFDIR) == S_IFDIR)
+			{
+#ifdef DEBUG_SERVER_MESSAGES
+				std::cout << "it's a dir, add an index where needed: " << it->autoIndex << std::endl;
+#endif
+				if (_method == "GET")
+				{
+					if (it->autoIndex == false)
+					{
+#ifdef DEBUG_SERVER_MESSAGES
+						std::cout << "adding an index '" << it->index << "'" << std::endl;
+#endif
+						_rTarget += "/" + it->index;
+					}
+					else
+					{
+#ifdef DEBUG_SERVER_MESSAGES
+						std::cout << "AUTOINDEX MEEEEEEEEEEEEEE" << std::endl;
+#endif
+						// autoindex is about making a cool page that lists dirs.
+//						_generateDirListing(); // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+					}
+				}
+				else if (_method == "POST" || _method == "DELETE")
+				{
+					// you can't just post a file over a directory which exists already
+					// nor can you delete a directory
+					throw internalServerError();
+				}
+			}
+			// it's a file? even better, do nothing. or, maybe, a cgi
+			// TODO cgi checker here?
+			pathFoundInLocs = true;
+			break ;
+		}
 	}
-	_rTarget = _defaultContentPath + _rTarget;
+	if (!pathFoundInLocs)
+	{
+#ifdef DEBUG_SERVER_MESSAGES
+		std::cout << "path not found in locs. constructing from root" << std::endl;
+#endif
+		_rTarget = server.root + "/" + _rTarget;
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(_rTarget.c_str(), &st);
+		// there's nothing here lol
+		if (statResponse == -1)
+		{
+			if (_method == "GET" || _method == "DELETE")
+			{
+				throw notFound();
+			}
+		}
+		// ok, it's a directory, add an index file to it, if autoindex is off
+		// wait, but root autoindex is always off, iirc.
+		if ((st.st_mode & S_IFDIR) == S_IFDIR)
+		{
+			if (_method == "GET")
+			{
+				_rTarget += "/" + server.index;
+			}
+			else
+			{
+				throw internalServerError();
+			}
+		}
+		// TODO cgi checker here?
+	}
+#ifdef DEBUG_SERVER_MESSAGES
 	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
+#endif
+
 
 	// amazing, first line parsed.
 	// now, 1. get next line
@@ -244,21 +366,33 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		pos = line.find(":");
 		if (pos == std::string::npos)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Didn't find a colon in '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 			throw badRequest();
 		}
 		helper = line.substr(0, pos);
 		if (helper.size() <= 1)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Semicolon encountered without field name? on '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 			throw badRequest();
 		}
 		if (helper.find(" ") != std::string::npos)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Spaces in field name on '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 			throw badRequest();
 		}
 		std::string::iterator	itt = helper.begin();
@@ -273,11 +407,13 @@ RequestHeadParser::RequestHeadParser(std::string r)
 			// if some idiotic protocol decides to plop a naked \n down there to mark like the "new line"
 			// we're gonna be like alright it's valid too yay.
 			// HOWEVER if someone is like "yoooo it would be awesome to include a \n in one of the fields"
-			// we're gonna be like nuh uuuuuuuuuuuh!! nuuuuuuuuuuuuuuuuuuhhhh uuuuuuuuuuuuuuhhh!
+			// we're gonna be like nuh uuuuuuuuuuuh!! nuuuuuuhhhh uuuuuuuuuuuuuuhhh!
 			// sorry croski but it's straight to the next field.
 			if (line.find("\r") == line.size() - 1)
 			{
+#ifdef DEBUG_SERVER_MESSAGES
 				std::cout << "\\r located on position " << line.find("\r") << std::endl;
+#endif
 				_head[helper] = line.substr(pos + 1, line.size() - 2 - pos);
 			}
 			else
@@ -292,19 +428,35 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		}
 		else
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Unknown line found: '" << line.substr(0, line.size() - 1) << "'" << std::endl;
+#endif
 		}
 	}
 
+	//	#ifdef DEBUG_SERVER_MESSAGES
 //	std::cout << "let's print everything" << std::endl;
+//	#endif
 //	for (auto it = _head.begin(); it != _head.end(); it++)
 //	{
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << "'" << it->first << "'" << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << "is..." << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << "'" << it->second << "'" << std::endl;
+//		#endif
+//		#ifdef DEBUG_SERVER_MESSAGES
 //		std::cout << std::endl;
+//		#endif
 //	}
 	// k-a managing, part 1
 	helper = _head["connection"];
@@ -353,8 +505,12 @@ RequestHeadParser::RequestHeadParser(std::string r)
 		cls >> _contLen;
 		if (cls.fail() || cls.peek() > 0)
 		{
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << _contLen << std::endl;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "     > " << "Content length '" << _head["content-length"] << "' found to be bad" << std::endl;
+#endif
 			throw badRequest();
 		}
 	}
@@ -397,4 +553,9 @@ bool		RequestHeadParser::getKeepAlive(void) const
 time_t		RequestHeadParser::getKaTimeout(void) const
 {
 	return (_kaTimeout);
+}
+
+std::string	RequestHeadParser::getUrl(void) const
+{
+	return (_url);
 }

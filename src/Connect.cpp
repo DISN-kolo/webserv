@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(KA_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(KA_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0), _rTarget("")
 {
 }
 
@@ -20,6 +20,7 @@ Connect &Connect::operator=(const Connect & obj)
 	_fd = obj.getFd();
 	_remainingFileSize = obj.getRemainingFileSize();
 	_serverContext = obj.getServerContext();
+	_rTarget = obj.getRTarget();
 	return (*this);
 }
 
@@ -97,6 +98,11 @@ struct config_server_t	Connect::getServerContext(void) const
 	return (_serverContext);
 }
 
+std::string	Connect::getRTarget(void) const
+{
+	return (_rTarget);
+}
+
 // v for value lol
 void	Connect::setNeedsBody(bool v)
 {
@@ -163,6 +169,11 @@ void	Connect::setServerContext(struct config_server_t v)
 	_serverContext = v;
 }
 
+void	Connect::setRTarget(std::string v)
+{
+	_rTarget = v;
+}
+
 void	Connect::eraseSendStr(size_t pos, size_t len)
 {
 	_sendStr.erase(pos, len);
@@ -178,4 +189,10 @@ void	Connect::diminishRemainingFileSize(int amt)
 	{
 		_remainingFileSize -= amt;
 	}
+}
+
+void	Connect::setPortInUse(int port)
+{
+	_serverContext.ports.clear();
+	_serverContext.ports.push_back(port);
 }
