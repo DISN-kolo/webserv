@@ -38,6 +38,9 @@ private:
 
 	// for content-location purposes in the response
 	std::string	_url;
+	// redirecting
+	bool		_redirection;
+	std::string	_redirLoc;
 public:
 	RequestHeadParser(std::string r, struct config_server_t server);
 	~RequestHeadParser();
@@ -53,5 +56,7 @@ public:
 	time_t		getKaTimeout(void) const;
 
 	std::string	getUrl(void) const;
+	bool		getRedirection(void) const;
+	std::string	getRedirLoc(void) const;
 } ;
 #endif
