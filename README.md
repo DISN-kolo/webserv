@@ -3,7 +3,9 @@
 
 ### TODOs
 
-* redirect
+* limit client body size
+* directory listing
+* redirect particularities...
 * CGI
 * CGI check for while true (add a timeout to cgi itself)
 * binary data ?
