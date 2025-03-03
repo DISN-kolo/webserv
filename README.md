@@ -3,7 +3,7 @@
 
 ### TODOs
 
-* DELETE
+* redirect
 * CGI
 * CGI check for while true (add a timeout to cgi itself)
 * binary data ?

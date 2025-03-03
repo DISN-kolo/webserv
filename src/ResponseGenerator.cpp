@@ -208,6 +208,53 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req)
 		ss << CRLF;
 		_text = ss.str();
 	}
+	else if (req.getMethod() == "DELETE")
+	{
+#ifdef DEBUG_SERVER_MESSAGES
+		std::cout << "it's a delete of '" << req.getRTarget().c_str() << "'" << std::endl;
+#endif
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(req.getRTarget().c_str(), &st);
+		if (statResponse == -1)
+		{
+#ifdef DEBUG_SERVER_MESSAGES
+			std::cout << "it's a stat == -1" << std::endl;
+#endif
+			throw notFound();
+		}
+		if ((st.st_mode & S_IFREG) != S_IFREG)
+		{
+#ifdef DEBUG_SERVER_MESSAGES
+			std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
+			std::cout << st.st_mode << std::endl;
+#endif
+			throw internalServerError();
+		}
+		if (remove(req.getRTarget().c_str()) != 0)
+		{
+#ifdef DEBUG_SERVER_MESSAGES
+			std::cout << "remove failed" << std::endl;
+#endif
+			throw internalServerError();
+		}
+		else
+		{
+#ifdef DEBUG_SERVER_MESSAGES
+			std::cout << "remove OK" << std::endl;
+#endif
+		}
+
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "204 No Content" << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Length: " << 0 << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+	}
 }
 
 ResponseGenerator::ResponseGenerator(const ResponseGenerator & obj)

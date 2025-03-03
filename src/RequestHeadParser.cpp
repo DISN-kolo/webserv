@@ -293,9 +293,10 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 //						_generateDirListing(); // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
 					}
 				}
-				else
+				else if (_method == "POST" || _method == "DELETE")
 				{
-					// you can't just post a file over a dictionary which exists already
+					// you can't just post a file over a directory which exists already
+					// nor can you delete a directory
 					throw internalServerError();
 				}
 			}
@@ -323,6 +324,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			}
 		}
 		// ok, it's a directory, add an index file to it, if autoindex is off
+		// wait, but root autoindex is always off, iirc.
 		if ((st.st_mode & S_IFDIR) == S_IFDIR)
 		{
 			if (_method == "GET")
@@ -399,7 +401,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			// if some idiotic protocol decides to plop a naked \n down there to mark like the "new line"
 			// we're gonna be like alright it's valid too yay.
 			// HOWEVER if someone is like "yoooo it would be awesome to include a \n in one of the fields"
-			// we're gonna be like nuh uuuuuuuuuuuh!! nuuuuuuuuuuuuuuuuuuhhhh uuuuuuuuuuuuuuhhh!
+			// we're gonna be like nuh uuuuuuuuuuuh!! nuuuuuuhhhh uuuuuuuuuuuuuuhhh!
 			// sorry croski but it's straight to the next field.
 			if (line.find("\r") == line.size() - 1)
 			{

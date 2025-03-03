@@ -112,6 +112,7 @@ void	Server::_purgeOneConnection(int i)
 {
 	_localRecvBuffers[i].clear();
 	_localFWriteBuffers[i].clear();
+	_fWCounts[i] = 0;
 	close(_socks[i].fd);
 	_socks[i].fd = -1;
 
@@ -271,7 +272,9 @@ void	Server::_onHeadLocated(int i)
 		{
 			// this is DELETE.... obviously, TODO. not implemented yet at all
 			_perConnArr[i]->setNeedsBody(false);
-			ResponseGenerator	responseObject(200);
+			_debugMsgI(i, "DELETE (RO too lol) started");
+			ResponseGenerator	responseObject(req);
+			_debugMsgI(i, "DELETE SUCCESS");
 
 			_firstTimeSender(&responseObject, i, false, true);
 
@@ -896,6 +899,7 @@ void	Server::run(void)
 //				_debugMsgI(_perConnArr[i - _connsAmt]->getContLen(), "<- contlen for the file was");
 				// done. close the file
 				close(_socks[i].fd);
+				_fWCounts[i - _connsAmt] = 0;
 				_socks[i].fd = -1;
 				// must send the 201 created now
 				_socks[i - _connsAmt].events = POLLOUT;
@@ -905,9 +909,9 @@ void	Server::run(void)
 			}
 			else if (_fWCounts[i - _connsAmt] > _perConnArr[i - _connsAmt]->getContLen())
 			{
-				// XXX TODO FIXME
-				_debugMsgI(i, "too much");
-				return ;
+				_debugMsgI(i, "too much data. deleting the file");
+				remove(_perConnArr[i]->getRTarget().c_str());
+				_purgeOneConnection(i - _connsAmt);
 			}
 			else if ((!_perConnArr[i - _connsAmt]->getKeepAlive() || _perConnArr[i - _connsAmt]->getKaTimeout() < time(NULL) - _perConnArr[i - _connsAmt]->getTimeStarted()))
 			{
