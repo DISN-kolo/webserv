@@ -422,13 +422,14 @@ void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brack
 	std::vector<std::pair<std::string, std::string> >	errors;
 	std::pair<std::string, std::string>					tmp;
 	std::string	errCode, errPath;
-	int			j = 0, n;
+	int			j, n;
 
 	if (brackets != 1 || _config.back().customErrors.size())
 		throw configFileLineException();
 
 	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
 	{
+		j = 0;
 		if (std::isdigit((*i)[0]))
 		{
 			while ((*i)[j] && !std::isspace((*i)[j]))
@@ -440,7 +441,9 @@ void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brack
 			if (n < 400 || n > 599)
 				throw configFileLineException();
 			tmp.first = errCode;
-			tmp.second = (*i).substr(j + 2);
+			while ((*i)[j] && std::isspace((*i)[j]))
+				j++;
+			tmp.second = (*i).substr(j);
 		}
 		else
 		{
@@ -449,7 +452,6 @@ void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brack
 		}
 		errors.push_back(tmp);
 	}
-
 	_config.back().customErrors = errors;
 }
 
