@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   ResponseGenerator.cpp                              :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
+/*   Updated: 2025/03/04 16:00:59 by akozin           ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "../inc/ResponseGenerator.hpp"
 
 ResponseGenerator::ResponseGenerator()
@@ -123,14 +135,16 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 	_server = server;
 	if (req.getDirlist())
 	{
-		// TODO XXX dirlist generator here.
+		std::string	listing = _generateListing(req.getRTarget(), req.getApparentTarget(), server);
 		_hasFile = false;
 		std::stringstream	ss;
 		ss << "HTTP/1.1 " << "200 OK" << CRLF;
-		ss << "Location: " << req.getRedirLoc() << CRLF;
 		ss << "Date: " << _getDate() << CRLF;
 		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Type: " << _getContentType() << CRLF;
+		ss << "Content-Length: " << listing.size() << CRLF;
 		ss << CRLF;
+		ss << listing;
 		_text = ss.str();
 		return ;
 	}
@@ -253,8 +267,6 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << st.st_mode << std::endl;
 #endif
 			throw internalServerError();
@@ -311,6 +323,61 @@ void	ResponseGenerator::_defaultErrorPageGenerator(const char * ewhat)
 	ss << cont;
 	ss << CRLF;
 	_text = ss.str();
+}
+
+std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string apparentTarget, struct config_server_t server)
+{
+	std::string	ret;
+	ret = "<body>\n<h1>\n";
+	ret += "Listing of " + apparentTarget + ":\n";
+	ret += "</h1>\n<hr />\n<table>\n";
+	ret += "<thead>\n<tr>\n<th scope=\"col\">Type</th>\n<th scope=\"col\">Name</th>\n</tr>\n</thead>";
+	ret += "<tbody>\n";
+	
+	DIR				*dirVar = opendir(dirpath.c_str());
+	struct dirent	*dEnt;
+	if (dirVar == NULL)
+	{
+#ifdef DEBUG_SERVER_MESSAGES
+		std::cout << "opendir failed on autoindexing of " << apparentTarget << ", which is " << dirpath << " in real life" << std::endl;
+#endif
+		throw internalServerError();
+	}
+
+	struct stat	st;
+	int			statResponse;
+	std::string	fmode;
+	dEnt = readdir(dirVar);
+	while (dEnt != NULL)
+	{
+		statResponse = stat((dirpath + "/" + dEnt->d_name).c_str(), &st);
+		if (statResponse == -1)
+		{
+#ifdef DEBUG_SERVER_MESSAGES
+			std::cout << "stat failed on " << dirpath << " " << dEnt->d_name << std::endl;
+#endif
+			dEnt = readdir(dirVar);
+			continue ;
+		}
+		if ((st.st_mode & S_IFREG) == S_IFREG)
+		{
+			fmode = "file";
+		}
+		else if ((st.st_mode & S_IFDIR) == S_IFDIR)
+		{
+			fmode = " dir";
+		}
+		else
+		{
+			fmode = "misc";
+		}
+		std::ostringstream	returlss;
+		returlss << "http://" + server.host + ":" << server.ports[0] << apparentTarget + "/";
+		ret += "<tr>\n<td>" + fmode + "</td>\n<td><a href=\"" + returlss.str() + std::string(dEnt->d_name) + "\">" + std::string(dEnt->d_name) + "</a></td>\n</tr>\n";
+		dEnt = readdir(dirVar);
+	}
+	ret += "</tbody>\n</table>\n</body>\n";
+	return (ret);
 }
 
 // dummy function. TODO

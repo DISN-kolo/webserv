@@ -43,6 +43,7 @@ private:
 	std::string	_redirLoc;
 	// dirlisting
 	bool		_dirlist;
+	std::string	_apparentTarget;
 public:
 	RequestHeadParser(std::string r, struct config_server_t server);
 	~RequestHeadParser();
@@ -62,5 +63,6 @@ public:
 	std::string	getRedirLoc(void) const;
 
 	bool		getDirlist(void) const;
+	std::string	getApparentTarget(void) const;
 } ;
 #endif

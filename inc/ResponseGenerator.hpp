@@ -4,9 +4,7 @@
 # include "RequestHeadParser.hpp"
 
 # include <sstream>
-
-// wait, what SHOULD a response generator have?
-// should it parse requests?
+# include <dirent.h>
 
 class ResponseGenerator
 {
@@ -21,6 +19,8 @@ private:
 	std::string	_getDate(void);
 	std::string	_getServerName(void);
 	std::string	_getContentType(void);
+
+	std::string	_generateListing(std::string dirpath, std::string apparentTarget, struct config_server_t server);
 
 	std::string	_text;
 	off_t		_fSize;

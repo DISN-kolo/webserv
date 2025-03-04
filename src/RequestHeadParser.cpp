@@ -126,6 +126,7 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t server)
 	:	_r(r)
 {
+	_apparentTarget = "";
 	_redirection = false;
 	_dirlist = false;
 	std::ostringstream	urlss;
@@ -234,7 +235,8 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 
 	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
 	_pathDeobfuscator();
-	// _rTarget changed. connect it to the url string for the content-location stuff
+	// _rTarget changed. connect it to the url string for the content-location stuff. also, save it as "apparent target" for dirlisting.
+	_apparentTarget = _rTarget;
 	urlss << _rTarget;
 	_url = urlss.str();
 	bool pathFoundInLocs = false;
@@ -563,4 +565,9 @@ std::string	RequestHeadParser::getRedirLoc(void) const
 bool		RequestHeadParser::getDirlist(void) const
 {
 	return (_dirlist);
+}
+
+std::string	RequestHeadParser::getApparentTarget(void) const
+{
+	return (_apparentTarget);
 }
