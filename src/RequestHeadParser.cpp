@@ -167,8 +167,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	{
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "Method not found in acceptable list" << std::endl;
 #endif
 		// TODO maybe 501?
@@ -183,8 +181,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	{
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "This first line is way too short" << std::endl;
 #endif
 		throw badRequest();
@@ -192,14 +188,14 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 
 	// HTTP/1.0 support or nah? XXX
 	// solely for apache benchmark purposes xddddddd
-	if (line.find("HTTP/1.1\r", line.size() - std::string("HTTP/1.1\r").size()) == std::string::npos)
+	if ((line.find("HTTP/1.1\r", line.size() - std::string("HTTP/1.1\r").size()) == std::string::npos)
+		&& (line.find("HTTP/1.1", line.size() - std::string("HTTP/1.1").size()) == std::string::npos))
 	{
-		if (line.find("HTTP/1.0\r", line.size() - std::string("HTTP/1.0\r").size()) == std::string::npos)
+		if ((line.find("HTTP/1.0\r", line.size() - std::string("HTTP/1.0\r").size()) == std::string::npos)
+			&& (line.find("HTTP/1.0", line.size() - std::string("HTTP/1.0").size()) == std::string::npos))
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Bad protocol" << std::endl;
 #endif
 			throw badRequest();
@@ -228,8 +224,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Too many words in Start Line" << std::endl;
 #endif
 			throw badRequest();
@@ -372,8 +366,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Didn't find a colon in '" << line.substr(0, line.size() - 1) << "'" << std::endl;
 #endif
 			throw badRequest();
@@ -383,8 +375,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Semicolon encountered without field name? on '" << line.substr(0, line.size() - 1) << "'" << std::endl;
 #endif
 			throw badRequest();
@@ -393,8 +383,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Spaces in field name on '" << line.substr(0, line.size() - 1) << "'" << std::endl;
 #endif
 			throw badRequest();
@@ -434,8 +422,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << std::setw(7) << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "Unknown line found: '" << line.substr(0, line.size() - 1) << "'" << std::endl;
 #endif
 		}
@@ -511,8 +497,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		{
 #ifdef DEBUG_SERVER_MESSAGES
 			std::cout << _contLen << std::endl;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 			std::cout << "     > " << "Content length '" << _head["content-length"] << "' found to be bad" << std::endl;
 #endif
 			throw badRequest();

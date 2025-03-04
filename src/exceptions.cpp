@@ -92,6 +92,11 @@ const char *lengthRequired::what(void) const throw()
 	return ("411 Length Required");
 }
 
+const char *contentTooLarge::what(void) const throw()
+{
+	return ("413 Content Too Large");
+}
+
 const char *internalServerError::what(void) const throw()
 {
 	return ("500 Internal Server Error");

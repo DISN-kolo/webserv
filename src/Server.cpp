@@ -221,6 +221,12 @@ void	Server::_onHeadLocated(int i)
 			_debugMsgI(i, "POST RO generated successfully");
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
+			if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
+			{
+				_debugMsgI(i, std::string("whoops! you need to remove ") + _perConnArr[i]->getRTarget());
+				remove(_perConnArr[i]->getRTarget().c_str());
+				throw contentTooLarge();
+			}
 			_eraseDoubleNlInLocalRecvBuffer(i);
 			_localFWriteBuffers[i] = _localRecvBuffers[i];
 			_localRecvBuffers[i].clear();
@@ -508,8 +514,6 @@ void	Server::run(void)
 						_purgeOneConnection(i);
 #ifdef DEBUG_SERVER_MESSAGES
 						std::cout << std::setw(4) << i << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 						std::cout << "_retCode " << _retCode << " but since we're stupid we're gonna do nothing special. OR ARE WE??? (stupid i mean)" << std::endl;
 #endif
 					}
@@ -525,14 +529,8 @@ void	Server::run(void)
 							{
 #ifdef DEBUG_SERVER_MESSAGES
 								std::cout << std::setw(4) << i << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 								std::cout << "_retCode is 0, the local recv buffer is " << _localRecvBuffers[i].size() << " long, we need a body." << std::endl;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 								std::cout << std::setw(4) << i << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 								std::cout << "content-length for this one is supposed to be " << _perConnArr[i]->getContLen() << "..." << std::endl;
 #endif
 								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
@@ -616,8 +614,6 @@ void	Server::run(void)
 						// https://datatracker.ietf.org/doc/html/rfc9112#section-2.2-4
 #ifdef DEBUG_SERVER_MESSAGES
 						std::cout << std::setw(4) << i << " > " << std::flush;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
 						std::cout << "Message received (maybe) partially, " << _retCode << " bytes, RBUF (w/o \\0) is " << _rbufSize << "." << std::endl;
 #endif
 						_debugMsgI(i, "received:");

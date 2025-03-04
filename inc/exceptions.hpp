@@ -113,6 +113,12 @@ class	lengthRequired: public std::exception
 		virtual const char	*what(void) const throw();
 };
 
+class	contentTooLarge: public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	internalServerError: public std::exception
 {
 	public:

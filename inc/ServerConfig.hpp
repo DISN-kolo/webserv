@@ -24,7 +24,7 @@ struct config_server_t {
 	std::string					host;
 	std::string					name;
 	std::vector<std::pair<std::string, std::string> >	customErrors;
-	int							maxBodySize;
+	size_t						maxBodySize;
 	std::string					index;
 	std::string					root;
 
