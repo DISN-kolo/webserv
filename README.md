@@ -3,7 +3,6 @@
 
 ### TODOs
 
-* limit client body size
 * directory listing
 * redirect particularities...
 * CGI
@@ -34,7 +33,7 @@
 * return:
 * name: mandatory
 * root: mandatory
-* autoindex: default false
+* autoindex: default off
 * index: default index.html
 * cgi\_ext: default .php
 * cgi\_path: default /bin/php

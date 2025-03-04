@@ -41,6 +41,9 @@ private:
 	// redirecting
 	bool		_redirection;
 	std::string	_redirLoc;
+	// dirlisting
+	bool		_dirlist;
+	std::string	_apparentTarget;
 
 	int		_cgiPath;
 	bool	_checkCgiExtension(struct config_location_t location);
@@ -61,5 +64,8 @@ public:
 	std::string	getUrl(void) const;
 	bool		getRedirection(void) const;
 	std::string	getRedirLoc(void) const;
+
+	bool		getDirlist(void) const;
+	std::string	getApparentTarget(void) const;
 } ;
 #endif
