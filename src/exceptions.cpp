@@ -1,5 +1,9 @@
 #include "../inc/exceptions.hpp"
 
+const char *envException::what(void) const throw()
+{
+	return ("Enviroment error: unable to read correctly");
+}
 
 const char *configFileException::what(void) const throw()
 {
@@ -20,7 +24,6 @@ const char *configFileMissingException::what(void) const throw()
 {
 	return ("Config file error: missing configuration");
 }
-
 
 const char *socketUnopenedError::what(void) const throw()
 {

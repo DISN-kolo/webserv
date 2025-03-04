@@ -26,12 +26,14 @@ unsigned long	Server::_strIpToUL(std::string ip) const
 	return (res);
 }
 
-Server::Server(int argc, char** argv)
+Server::Server(int argc, char** argv, char **env)
 {
 	_rbufSize = 4096;
 	_sbufSize = 4096;
 	_blogSize = 4096;
 	_connsAmt = CONNS_AMT;
+	_env = env;
+	_parseEnvPaths();
 	if (argc == 1)
 		_grandConfig = new ServerConfig();
 	else if (argc == 2)
@@ -254,7 +256,7 @@ void	Server::_onHeadLocated(int i)
 			// this is for file deletion purposes.
 			_perConnArr[i]->setRTarget(req.getRTarget());
 			_debugMsgI(i, "POST RO generation started");
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env, _envPaths);
 			_debugMsgI(i, "POST RO generated successfully");
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
@@ -282,7 +284,7 @@ void	Server::_onHeadLocated(int i)
 		{
 			_perConnArr[i]->setNeedsBody(false);
 			_debugMsgI(i, "GET RO generation started");
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env, _envPaths);
 			_debugMsgI(i, "GET RO generated successfully");
 			// this if is important, since we can return a dirlist instead
 			if (responseObject.getHasFile())
@@ -298,7 +300,7 @@ void	Server::_onHeadLocated(int i)
 			// this is DELETE
 			_perConnArr[i]->setNeedsBody(false);
 			_debugMsgI(i, "DELETE (RO too lol) started");
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env, _envPaths);
 			_debugMsgI(i, "DELETE SUCCESS");
 
 			_firstTimeSender(&responseObject, i, false, true);
@@ -831,4 +833,26 @@ Server::~Server()
 	{
 		delete _perConnArr[i];
 	}
+}
+
+void	Server::_parseEnvPaths(void)
+{
+	std::string					path;
+	std::vector<std::string>	paths;
+	int	i = 0;
+
+	while (_env[i] && !std::string(_env[i]).find("PATH=") == 0)
+		i++;
+	if (!_env[i])
+		throw envException();
+	
+	std::stringstream	str(_env[i]);
+	while (getline(str, path, ':'))
+	{
+		if (path.find("PATH=") == 0)
+			paths.push_back(path.substr(5));
+		else
+			paths.push_back(path);
+	}
+	_envPaths = paths;	
 }
