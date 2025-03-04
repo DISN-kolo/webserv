@@ -121,6 +121,19 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server)
 {
 	_server = server;
+	if (req.getDirlist())
+	{
+		// TODO XXX dirlist generator here.
+		_hasFile = false;
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "200 OK" << CRLF;
+		ss << "Location: " << req.getRedirLoc() << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << CRLF;
+		_text = ss.str();
+		return ;
+	}
 	if (req.getRedirection())
 	{
 		_hasFile = false;

@@ -127,6 +127,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	:	_r(r)
 {
 	_redirection = false;
+	_dirlist = false;
 	std::ostringstream	urlss;
 	urlss << "http://" + server.host + ":" << server.ports[0] << "/";
 //	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
@@ -294,7 +295,8 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 						std::cout << "AUTOINDEX MEEEEEEEEEEEEEE" << std::endl;
 #endif
 						// autoindex is about making a cool page that lists dirs.
-//						_generateDirListing(); // TODO TODO TODO TODO TODO TODO TODO TODO TODO TODO
+						// obviously, it should be done in the response generator.
+						_dirlist = true;
 					}
 				}
 				else if (_method == "POST" || _method == "DELETE")
@@ -556,4 +558,9 @@ bool		RequestHeadParser::getRedirection(void) const
 std::string	RequestHeadParser::getRedirLoc(void) const
 {
 	return (_redirLoc);
+}
+
+bool		RequestHeadParser::getDirlist(void) const
+{
+	return (_dirlist);
 }

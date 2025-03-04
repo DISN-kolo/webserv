@@ -3,7 +3,6 @@
 
 ### TODOs
 
-* limit client body size
 * directory listing
 * redirect particularities...
 * CGI

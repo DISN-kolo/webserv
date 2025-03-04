@@ -41,6 +41,8 @@ private:
 	// redirecting
 	bool		_redirection;
 	std::string	_redirLoc;
+	// dirlisting
+	bool		_dirlist;
 public:
 	RequestHeadParser(std::string r, struct config_server_t server);
 	~RequestHeadParser();
@@ -58,5 +60,7 @@ public:
 	std::string	getUrl(void) const;
 	bool		getRedirection(void) const;
 	std::string	getRedirLoc(void) const;
+
+	bool		getDirlist(void) const;
 } ;
 #endif
