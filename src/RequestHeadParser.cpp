@@ -129,6 +129,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	_apparentTarget = "";
 	_redirection = false;
 	_dirlist = false;
+	_cgiPath = -1;
 	std::ostringstream	urlss;
 	urlss << "http://" + server.host + ":" << server.ports[0] << "/";
 //	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
@@ -262,6 +263,10 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			// XXX for now, relativize the root in the location. might be changed soon XXX
 			_rTarget = server.root + "/" + it->root + "/" + _rTarget;
 			// first, check if the result is a directory or not.
+			
+			if (_checkCgiExtension(*it))
+				return ;			
+
 			struct stat	st;
 			int			statResponse;
 			statResponse = stat(_rTarget.c_str(), &st);
@@ -308,8 +313,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 					throw internalServerError();
 				}
 			}
-			// it's a file? even better, do nothing. or, maybe, a cgi
-			// TODO cgi checker here?
 			pathFoundInLocs = true;
 			break ;
 		}
@@ -344,7 +347,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 				throw internalServerError();
 			}
 		}
-		// TODO cgi checker here?
 	}
 #ifdef DEBUG_SERVER_MESSAGES
 	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
@@ -506,6 +508,23 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			throw badRequest();
 		}
 	}
+}
+
+bool	RequestHeadParser::_checkCgiExtension(struct config_location_t location)
+{
+	int	j = 0;
+
+	for (std::vector<std::string>::iterator i = location.cgiExt.begin(); i != location.cgiExt.end(); i++)
+	{
+		if (_rTarget.find(*i, _rTarget.length() - i->length()) != std::string::npos)
+		{
+			_cgiPath = j;
+			std::cout << _rTarget << "|" << *i << "|" << _rTarget[_rTarget.length() - i->length()] << std::endl;
+			return (true);
+		}
+		j++;
+	}
+	return (false);
 }
 
 RequestHeadParser::~RequestHeadParser()
