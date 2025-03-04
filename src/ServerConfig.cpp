@@ -473,12 +473,17 @@ void	ServerConfig::_validateConfigRequirements()
 				throw configFileMissingException();
 			if (!j->accMethods.size())
 				j->accMethods.push_back("GET");
+			if (j->index.empty())
+				j->index = "index.html";
+			if (j->cgiPath.size() != j->cgiExt.size())
+			{
+				j->cgiExt.clear();
+				j->cgiPath.clear();
+			}
 			if (!j->cgiExt.size())
 				j->cgiExt.push_back(".php");
 			if (!j->cgiPath.size())
 				j->cgiPath.push_back("/bin/php");
-			if (j->index.empty())
-				j->index = "index.html";
 		}
 	}
 }

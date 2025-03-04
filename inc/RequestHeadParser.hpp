@@ -41,6 +41,9 @@ private:
 	// redirecting
 	bool		_redirection;
 	std::string	_redirLoc;
+
+	int		_cgiPath;
+	bool	_checkCgiExtension(struct config_location_t location);
 public:
 	RequestHeadParser(std::string r, struct config_server_t server);
 	~RequestHeadParser();
