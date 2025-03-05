@@ -129,7 +129,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	_apparentTarget = "";
 	_redirection = false;
 	_dirlist = false;
-	_cgiPath = -1;
+	_cgiPath = "";
 	std::ostringstream	urlss;
 	urlss << "http://" + server.host + ":" << server.ports[0] << "/";
 //	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
@@ -518,8 +518,7 @@ bool	RequestHeadParser::_checkCgiExtension(struct config_location_t location)
 	{
 		if (_rTarget.find(*i, _rTarget.length() - i->length()) != std::string::npos)
 		{
-			_cgiPath = j;
-			std::cout << _rTarget << "|" << *i << "|" << _rTarget[_rTarget.length() - i->length()] << std::endl;
+			_cgiPath = location.cgiPath[j];
 			return (true);
 		}
 		j++;
@@ -589,4 +588,9 @@ bool		RequestHeadParser::getDirlist(void) const
 std::string	RequestHeadParser::getApparentTarget(void) const
 {
 	return (_apparentTarget);
+}
+
+std::string	RequestHeadParser::getCgiPath(void) const
+{
+	return (_cgiPath);
 }

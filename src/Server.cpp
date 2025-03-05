@@ -26,12 +26,13 @@ unsigned long	Server::_strIpToUL(std::string ip) const
 	return (res);
 }
 
-Server::Server(int argc, char** argv)
+Server::Server(int argc, char** argv, char **env)
 {
 	_rbufSize = 4096;
 	_sbufSize = 4096;
 	_blogSize = 4096;
 	_connsAmt = CONNS_AMT;
+	_env = env;
 	if (argc == 1)
 		_grandConfig = new ServerConfig();
 	else if (argc == 2)
@@ -243,7 +244,7 @@ void	Server::_onHeadLocated(int i)
 		{
 			// this is for file deletion purposes in case of fail
 			_perConnArr[i]->setRTarget(req.getRTarget());
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
 			_perConnArr[i]->setNeedsBody(true);
 			_perConnArr[i]->setContLen(req.getContLen());
 			if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
@@ -266,7 +267,7 @@ void	Server::_onHeadLocated(int i)
 		else if (req.getMethod() == "GET")
 		{
 			_perConnArr[i]->setNeedsBody(false);
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
 			// this if is important, since we can return a dirlist instead
 			if (responseObject.getHasFile())
 			{
@@ -279,7 +280,7 @@ void	Server::_onHeadLocated(int i)
 		else /* DELETE */
 		{
 			_perConnArr[i]->setNeedsBody(false);
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext());
+			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
 
 			_firstTimeSender(&responseObject, i, false, true);
 

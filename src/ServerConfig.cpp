@@ -483,7 +483,7 @@ void	ServerConfig::_validateConfigRequirements()
 			if (!j->cgiExt.size())
 				j->cgiExt.push_back(".php");
 			if (!j->cgiPath.size())
-				j->cgiPath.push_back("/bin/php");
+				j->cgiPath.push_back("/bin/php-cgi");
 		}
 	}
 }

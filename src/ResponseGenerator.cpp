@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/04 16:00:59 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/04 19:31:18 by molasz-a         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -130,9 +130,10 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 	}
 }
 
-ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server)
+ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env)
 {
 	_server = server;
+	_env = env;
 	if (req.getDirlist())
 	{
 		std::string	listing = _generateListing(req.getRTarget(), req.getApparentTarget(), server);
@@ -166,27 +167,35 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "it's a get of '" << req.getRTarget().c_str() << "'" << std::endl;
 #endif
+
 		struct stat	st;
-		int			statResponse;
-		statResponse = stat(req.getRTarget().c_str(), &st);
-		if (statResponse == -1)
+		if (!req.getCgiPath().empty())
+			_fd = _execCGI(req);
+		else
 		{
+			int			statResponse;
+			statResponse = stat(req.getRTarget().c_str(), &st);
+			std::cout << req.getRTarget() << " " << statResponse << std::endl;
+			if (statResponse == -1)
+			{
 #ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's a stat == -1" << std::endl;
+				std::cout << "it's a stat == -1" << std::endl;
 #endif
-			throw notFound();
+				throw notFound();
+			}
+			if ((st.st_mode & S_IFREG) != S_IFREG)
+			{
+#ifdef DEBUG_SERVER_MESSAGES
+				std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
+#endif
+#ifdef DEBUG_SERVER_MESSAGES
+				std::cout << st.st_mode << std::endl;
+#endif
+				throw internalServerError();
+			}
+			_fd = open(req.getRTarget().c_str(), O_RDONLY);
 		}
-		if ((st.st_mode & S_IFREG) != S_IFREG)
-		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << st.st_mode << std::endl;
-#endif
-			throw internalServerError();
-		}
-		_fd = open(req.getRTarget().c_str(), O_RDONLY);
+
 		if (_fd == -1)
 		{
 #ifdef DEBUG_SERVER_MESSAGES
@@ -227,6 +236,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 #endif
 			throw internalServerError();
 		}
+
 		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
 		if (_fd == -1)
 		{
@@ -378,6 +388,29 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 	}
 	ret += "</tbody>\n</table>\n</body>\n";
 	return (ret);
+}
+
+int	ResponseGenerator::_execCGI(const RequestHeadParser &req)
+{
+	pid_t	pid;
+	int		fds[2], status;
+	char	*argv[3] = {(char *)req.getCgiPath().c_str(), (char *)req.getRTarget().c_str(), NULL};
+
+	if (pipe(fds) < 0)
+		throw internalServerError();
+	pid = fork();
+	if (pid < 0)
+		throw internalServerError();
+	if (!pid)
+	{
+		dup2(fds[1], STDOUT_FILENO);
+		close(fds[0]);
+		close(fds[1]);
+		execve(req.getCgiPath().c_str(), argv, _env);
+		exit(1);
+	}
+	waitpid(pid, &status, 0);
+	return (fds[0]);
 }
 
 // dummy function. TODO
