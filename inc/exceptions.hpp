@@ -3,6 +3,12 @@
 
 # include <exception>
 
+class	envException : public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	configFileException : public std::exception
 {
 	public:

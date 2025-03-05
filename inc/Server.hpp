@@ -50,6 +50,7 @@ private:
 	int		_blogSize;
 	int		_connsAmt;
 
+	char	**_env;
 
 	// internal variables used for the run function and its subfunctions
 	struct pollfd				_socks[CONNS_AMT * 2];
@@ -73,7 +74,7 @@ private:
 	size_t						_nlnl;
 	std::vector<std::string>	_nls;
 public:
-	Server(int argc, char **argv);
+	Server(int argc, char **argv, char **env);
 	void	run(void);
 	~Server();
 } ;

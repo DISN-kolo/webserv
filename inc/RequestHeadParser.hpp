@@ -45,8 +45,8 @@ private:
 	bool		_dirlist;
 	std::string	_apparentTarget;
 
-	int		_cgiPath;
-	bool	_checkCgiExtension(struct config_location_t location);
+	std::string					_cgiPath;
+	bool						_checkCgiExtension(struct config_location_t location);
 public:
 	RequestHeadParser(std::string r, struct config_server_t server);
 	~RequestHeadParser();
@@ -67,5 +67,7 @@ public:
 
 	bool		getDirlist(void) const;
 	std::string	getApparentTarget(void) const;
+
+	std::string					getCgiPath(void) const;
 } ;
 #endif

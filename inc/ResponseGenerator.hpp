@@ -5,6 +5,7 @@
 
 # include <sstream>
 # include <dirent.h>
+# include <sys/wait.h>
 
 class ResponseGenerator
 {
@@ -22,6 +23,9 @@ private:
 
 	std::string	_generateListing(std::string dirpath, std::string apparentTarget, struct config_server_t server);
 
+	char	**_env;
+	int		_execCGI(const RequestHeadParser &req);
+
 	std::string	_text;
 	off_t		_fSize;
 	int			_fd;
@@ -31,7 +35,7 @@ private:
 public:
 	ResponseGenerator(int code);
 	ResponseGenerator(const char * ewhat, struct config_server_t server);
-	ResponseGenerator(const RequestHeadParser & req, struct config_server_t server);
+	ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env);
 	~ResponseGenerator();
 
 	std::string	getText(void) const;
