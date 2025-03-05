@@ -592,7 +592,7 @@ void	Server::run(void)
 						}
 					}
 				}
-				else /* Sending File == true */
+				else if (_perConnArr[i]->getSendingFile())
 				{
 					_tempFdI = i + _connsAmt;
 					if (((_socks[_tempFdI].revents & POLLERR) == POLLERR)
@@ -649,10 +649,66 @@ void	Server::run(void)
 					}
 					else
 					{
-						// file not hit by revents
 						_debugMsgI(i, "file not ready yet");
 						_debugMsgI(_tempFdI, "<- file");
 						_debugMsgI(_socks[_tempFdI].fd, "<- file's fd");
+						continue ;
+					}
+				}
+				else /* cgi only here */
+				{
+					_tempFdI = i + _connsAmt;
+					if (((_socks[_tempFdI].revents & POLLERR) == POLLERR)
+							|| ((_socks[_tempFdI].revents & POLLHUP) == POLLHUP)
+							|| ((_socks[_tempFdI].revents & POLLNVAL) == POLLNVAL))
+					{
+						_debugMsgI(i, "socket's cgi got an err/hup/nval");
+						_purgeOneConnection(i);
+						continue ;
+					}
+					else if ((_socks[_tempFdI].revents & POLLIN) == POLLIN)
+					{
+						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
+						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
+						if (_retCode < 0)
+						{
+							_debugMsgI(i, "retcode on file is < 0");
+							_purgeOneConnection(i);
+							continue ;
+						}
+						else if (_retCode == 0)
+						{
+							_perConnArr[i]->setTimeStarted(time(NULL));
+							_debugMsgI(i, "ABSOLUTELY done reading from the cgi");
+							_cleanAfterNormalRead(i);
+						}
+						else if (_perConnArr[i]->getFirstTimeCGISend())
+						{
+							// XXX cgi parsing here
+							// XXX adding headers before the cgi's response headers here
+							// XXX because we'll have more content than possibly the buffer size, localsendstring could be sent incorrectly
+							//thus we need to send it in parts up to sbuf size, like the usual sends
+						}
+						else
+						{
+							// the "regular". we need to diminish the local send str by what was sent.
+							_perConnArr[i]->setTimeStarted(time(NULL));
+
+							fileToReadBuf[_retCode] = 0;
+							_localSendString = std::string(fileToReadBuf);
+							send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+							_localSendString.erase(0, _retCode);
+
+
+							_debugMsgI(i, "the cgi part that was sent:");
+							_debugMsgI(i, _localSendString);
+						}
+					}
+					else
+					{
+						_debugMsgI(i, "cgi not ready yet");
+						_debugMsgI(_tempFdI, "<- fd's index");
+						_debugMsgI(_socks[_tempFdI].fd, "<- cgi's fd");
 						continue ;
 					}
 				}
@@ -665,11 +721,12 @@ void	Server::run(void)
 				}
 			} /* else if POLLOUT */
 		} /* for to iterate thru _socks upon poll's return */
-		// time to iterate thru the files!
+		// time to iterate thru the files! (or the cgis)
 		for (int i = _connsAmt; i < _connsAmt * 2; i++)
 		{
 			if (_socks[i].fd == -1 || ((_socks[i].events & POLLIN) == POLLIN))
 			{
+				// pollin is done in the socket part
 				continue ;
 			}
 			if (_socks[i].revents == 0)
