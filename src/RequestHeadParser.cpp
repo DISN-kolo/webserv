@@ -271,6 +271,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			}
 
 			struct stat	st;
+			std::memset(&(st), 0, sizeof(st));
 			int			statResponse;
 			statResponse = stat(_rTarget.c_str(), &st);
 			// there's nothing here lol
@@ -326,7 +327,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		std::cout << "path not found in locs. constructing from root" << std::endl;
 #endif
 		_rTarget = server.root + "/" + _rTarget;
+
 		struct stat	st;
+		std::memset(&(st), 0, sizeof(st));
 		int			statResponse;
 		statResponse = stat(_rTarget.c_str(), &st);
 		// there's nothing here lol
@@ -351,11 +354,10 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			}
 		}
 	}
+
 #ifdef DEBUG_SERVER_MESSAGES
 	std::cout << "true rtarget: '" << _rTarget << "'" << std::endl;
 #endif
-
-
 	// amazing, first line parsed.
 	// now, 1. get next line
 	// 2. check for ':'

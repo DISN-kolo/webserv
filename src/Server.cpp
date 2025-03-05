@@ -110,6 +110,7 @@ int	Server::_checkAvailFdI(void) const
 void	Server::_purgeOneConnection(int i)
 {
 	_localRecvBuffers[i].clear();
+	_localSendStrings[i].clear();
 	_localFWriteBuffers[i].clear();
 	_fWCounts[i] = 0;
 	close(_socks[i].fd);
@@ -174,55 +175,37 @@ void	Server::_cleanAfterNormalRead(int i)
 	_perConnArr[i]->setSendingFile(false);
 	_perConnArr[i]->setStillResponding(false);
 	_socks[i].events = POLLIN;
+	_localSendStrings[i].clear();
 }
 
+// FIXME erroneously sends without actually polling for POLLOUT first.
+//must only set the flags and fill the local strings.
 void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC)
 {
-	// in case of has file being true, the size would be just of the head
-	if (static_cast<size_t>(_sbufSize) < rO->getSize())
+	// TODO please check whether it's logical to do that here
+	_perConnArr[i]->setTimeStarted(time(NULL));
+	if (_perConnArr[i]->getIsCgi())
 	{
-		_localSendString = rO->getText().substr(0, _sbufSize);
-		send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
-
 		_socks[i].events = POLLOUT;
-		_perConnArr[i]->setSendStr(rO->getText());
-		_perConnArr[i]->eraseSendStr(0, _sbufSize);
 		_perConnArr[i]->setStillResponding(true);
-
-		_debugMsgI(i, "all the response:");
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << rO->getText() << std::flush;
-#endif
-		_debugMsgI(i, "the chunk that was sent:");
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << _localSendString << std::endl;
-#endif
+		_localSendStrings[i] = "";
 	}
 	else
 	{
-		send(_socks[i].fd, rO->getText().c_str(), rO->getSize(), 0);
-		_perConnArr[i]->setStillResponding(false);
-		_debugMsgI(i, "sent in one go:");
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << rO->getText() << std::endl;
-#endif
-		if (_perConnArr[i]->getHasFile())
-		{
-			_socks[i].events = POLLOUT;
-			_perConnArr[i]->setSendingFile(true);
-		}
-		else
-		{
-			_socks[i].events = POLLIN;
-		}
+		// in case of has file being true, the size would be just of the head
+		_localSendStrings[i] = std::string(rO->getText());
+
+		_socks[i].events = POLLOUT;
+		_perConnArr[i]->setSendStr(rO->getText());
+		_perConnArr[i]->setStillResponding(true);
 	}
-	_perConnArr[i]->setTimeStarted(time(NULL));
 
 	if (clearLRB)
 	{
 		_localRecvBuffers[i].clear();
 	}
 
+	// TODO please check if ever used.
 	if (purgeC)
 	{
 		if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
@@ -240,6 +223,7 @@ void	Server::_onHeadLocated(int i)
 		RequestHeadParser		req(_localRecvBuffers[i], _perConnArr[i]->getServerContext());
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
+		_perConnArr[i]->setIsCgi(req.getIsCgi());
 		if (req.getMethod() == "POST")
 		{
 			// this is for file deletion purposes in case of fail
@@ -378,6 +362,7 @@ void	Server::_serverRunSetupInit(void)
 	_localRecvBuffers = std::vector<std::string>(_connsAmt, "");
 	// this will store post request strings for them to be written chunk by chunk into the files via poll
 	_localFWriteBuffers = std::vector<std::string>(_connsAmt, "");
+	_localSendStrings = std::vector<std::string>(_connsAmt, "");
 	_fWCounts = std::vector<size_t>(_connsAmt, 0);
 }
 
@@ -413,8 +398,11 @@ void	Server::run(void)
 					{
 						_purgeOneConnection(i);
 					}
-					_debugMsgI(i, "not killed");
-					_debugMsgI(time(NULL) - _perConnArr[i]->getTimeStarted(), "<- alive for");
+					else
+					{
+						_debugMsgI(i, "not killed");
+						_debugMsgI(time(NULL) - _perConnArr[i]->getTimeStarted(), "<- alive for");
+					}
 				}
 			}
 		}
@@ -560,14 +548,14 @@ void	Server::run(void)
 					{
 						_perConnArr[i]->setTimeStarted(time(NULL));
 						_debugMsgI(i, "reset starting time");
-						_localSendString = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
-						send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+						_localSendStrings[i] = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
+						send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 
 						_perConnArr[i]->eraseSendStr(0, _sbufSize);
 
 						_debugMsgI(i, "the text that was sent:");
 #ifdef DEBUG_SERVER_MESSAGES
-						std::cout << _localSendString << std::endl;
+						std::cout << _localSendStrings[i] << std::endl;
 #endif
 					}
 					else
@@ -580,6 +568,7 @@ void	Server::run(void)
 #ifdef DEBUG_SERVER_MESSAGES
 						std::cout << _perConnArr[i]->getSendStr() << std::endl;
 #endif
+						_perConnArr[i]->eraseSendStr(0, _perConnArr[i]->getSendStr().size());
 						// maybe, cgi send needs to have its own flag XXX
 						if (_perConnArr[i]->getHasFile())
 						{
@@ -592,7 +581,7 @@ void	Server::run(void)
 						}
 					}
 				}
-				else if (_perConnArr[i]->getSendingFile())
+				else if (_perConnArr[i]->getSendingFile() && !_perConnArr[i]->getIsCgi())
 				{
 					_tempFdI = i + _connsAmt;
 					if (((_socks[_tempFdI].revents & POLLERR) == POLLERR)
@@ -626,10 +615,10 @@ void	Server::run(void)
 							_perConnArr[i]->setTimeStarted(time(NULL));
 							_debugMsgI(i, "the intended way of finishing reading a file reached.");
 							fileToReadBuf[_retCode] = 0;
-							_localSendString = std::string(fileToReadBuf);
-							send(_socks[i].fd, _localSendString.c_str(), _retCode, 0);
+							_localSendStrings[i] = std::string(fileToReadBuf);
+							send(_socks[i].fd, _localSendStrings[i].c_str(), _retCode + 1, 0);
 							_debugMsgI(i, "the last file part that was sent:");
-							_debugMsgI(i, _localSendString);
+							_debugMsgI(i, _localSendStrings[i]);
 							_cleanAfterNormalRead(i);
 						}
 						else
@@ -638,13 +627,13 @@ void	Server::run(void)
 							_perConnArr[i]->setTimeStarted(time(NULL));
 
 							fileToReadBuf[_retCode] = 0;
-							_localSendString = std::string(fileToReadBuf);
-							send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
+							_localSendStrings[i] = std::string(fileToReadBuf);
+							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 
 							_perConnArr[i]->diminishRemainingFileSize(_sbufSize);
 
 							_debugMsgI(i, "the file part that was sent:");
-							_debugMsgI(i, _localSendString);
+							_debugMsgI(i, _localSendStrings[i]);
 						}
 					}
 					else
@@ -655,7 +644,7 @@ void	Server::run(void)
 						continue ;
 					}
 				}
-				else /* cgi only here */
+				else if (_perConnArr[i]->getIsCgi())
 				{
 					_tempFdI = i + _connsAmt;
 					if (((_socks[_tempFdI].revents & POLLERR) == POLLERR)
@@ -678,12 +667,55 @@ void	Server::run(void)
 						}
 						else if (_retCode == 0)
 						{
-							_perConnArr[i]->setTimeStarted(time(NULL));
-							_debugMsgI(i, "ABSOLUTELY done reading from the cgi");
-							_cleanAfterNormalRead(i);
+							if (!_localSendStrings[i].empty())
+							{
+								_debugMsgI(i, "entered in the polled but ret = 0 state with some dangling tail from cgi");
+								// the remnants
+								_perConnArr[i]->setTimeStarted(time(NULL));
+
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
+								if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
+								{
+									_localSendStrings[i].clear();
+								}
+								else
+								{
+									_localSendStrings[i].erase(0, _sbufSize);
+								}
+
+								_debugMsgI(i, "the cgi part that was sent:");
+								_debugMsgI(i, _localSendStrings[i]);
+							}
+							else
+							{
+								_perConnArr[i]->setTimeStarted(time(NULL));
+								_debugMsgI(i, "ABSOLUTELY done reading from the cgi");
+								_cleanAfterNormalRead(i);
+							}
 						}
-						else if (_perConnArr[i]->getFirstTimeCGISend())
+						else if (_perConnArr[i]->getFirstTimeCgiSend())
 						{
+							std::cout << "retcode:" << _retCode << std::endl;
+							std::cout << "sizeof:" << sizeof (fileToReadBuf) << std::endl;
+							std::cout << "sbufsize:" << _sbufSize << std::endl;
+							fileToReadBuf[_retCode] = 0;
+							_perConnArr[i]->setFirstTimeCgiSend(false);
+							_perConnArr[i]->setTimeStarted(time(NULL));
+//							_localSendStrings[i] = "HTTP/1.1 " + /* XXX parsed status */ + CRLF;
+							_localSendStrings[i] = std::string("HTTP/1.1 200 OK");
+							_localSendStrings[i] += fileToReadBuf;
+							_debugMsgI(i, "hi! about to send this bad boy:");
+							std::cout << _localSendStrings[i].c_str() << std::endl;
+							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
+							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
+								_localSendStrings[i].clear();
+							}
+							else
+							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
+								_localSendStrings[i].erase(0, _sbufSize);
+							}
 							// XXX cgi parsing here
 							// XXX adding headers before the cgi's response headers here
 							// XXX because we'll have more content than possibly the buffer size, localsendstring could be sent incorrectly
@@ -695,21 +727,49 @@ void	Server::run(void)
 							_perConnArr[i]->setTimeStarted(time(NULL));
 
 							fileToReadBuf[_retCode] = 0;
-							_localSendString = std::string(fileToReadBuf);
-							send(_socks[i].fd, _localSendString.c_str(), _sbufSize, 0);
-							_localSendString.erase(0, _retCode);
-
+							_localSendStrings[i] += std::string(fileToReadBuf);
+							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
+							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
+							{
+								_localSendStrings[i].clear();
+							}
+							else
+							{
+								_localSendStrings[i].erase(0, _sbufSize);
+							}
 
 							_debugMsgI(i, "the cgi part that was sent:");
-							_debugMsgI(i, _localSendString);
+							_debugMsgI(i, _localSendStrings[i]);
 						}
 					}
 					else
 					{
-						_debugMsgI(i, "cgi not ready yet");
-						_debugMsgI(_tempFdI, "<- fd's index");
-						_debugMsgI(_socks[_tempFdI].fd, "<- cgi's fd");
-						continue ;
+						if (!_localSendStrings[i].empty())
+						{
+							_debugMsgI(i, "entered in the CGI not ready state with some dangling tail");
+							// the remnants
+							_perConnArr[i]->setTimeStarted(time(NULL));
+
+							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
+							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
+							{
+								_localSendStrings[i].clear();
+							}
+							else
+							{
+								_localSendStrings[i].erase(0, _sbufSize);
+							}
+
+							_debugMsgI(i, "the cgi part that was sent:");
+							_debugMsgI(i, _localSendStrings[i]);
+						}
+						else
+						{
+							_debugMsgI(i, "cgi not ready yet");
+							_debugMsgI(_tempFdI, "<- fd's index");
+							_debugMsgI(_socks[_tempFdI].fd, "<- cgi's fd");
+							continue ;
+						}
 					}
 				}
 

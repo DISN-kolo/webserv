@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/05 15:04:40 by molasz-a         ###   ########.fr       */
+/*   Updated: 2025/03/05 16:29:38 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -168,11 +168,11 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		std::cout << "it's a get of '" << req.getRTarget().c_str() << "'" << std::endl;
 #endif
 
-		struct stat	st;
 		if (req.getIsCgi())
 			_fd = _execCgi(req);
 		else
 		{
+			struct stat	st;
 			int			statResponse;
 			statResponse = stat(req.getRTarget().c_str(), &st);
 			if (statResponse == -1)
@@ -193,30 +193,28 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 				throw internalServerError();
 			}
 			_fd = open(req.getRTarget().c_str(), O_RDONLY);
-		}
-
-		if (_fd == -1)
-		{
+			_fSize = st.st_size;
+			_hasFile = true;
 #ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's an fd == -1" << std::endl;
-#endif
-			throw internalServerError();
-		}
-
-		_fSize = st.st_size;
-		_hasFile = true;
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << "epic! you've just opened a file to READ. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
+			std::cout << "epic! you've just opened a file to READ. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
 #endif
 
-		std::stringstream	ss;
-		ss << "HTTP/1.1 " << "200 OK" << CRLF;
-		ss << "Date: " << _getDate() << CRLF;
-		ss << "Server: " << _getServerName() << CRLF;
-		ss << "Content-Type: " << _getContentType() << CRLF;
-		ss << "Content-Length: " << _fSize << CRLF;
-		ss << CRLF;
-		_text = ss.str();
+			std::stringstream	ss;
+			ss << "HTTP/1.1 " << "200 OK" << CRLF;
+			ss << "Date: " << _getDate() << CRLF;
+			ss << "Server: " << _getServerName() << CRLF;
+			ss << "Content-Type: " << _getContentType() << CRLF;
+			ss << "Content-Length: " << _fSize << CRLF;
+			ss << CRLF;
+			_text = ss.str();
+			if (_fd == -1)
+			{
+#ifdef DEBUG_SERVER_MESSAGES
+				std::cout << "it's an fd == -1" << std::endl;
+#endif
+				throw internalServerError();
+			}
+		}
 	}
 	else if (req.getMethod() == "POST")
 	{

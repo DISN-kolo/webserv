@@ -14,8 +14,8 @@ DEPS = $(addprefix obj/, $(SRCNAMES:.cpp=.d))
 
 CC = c++
 
-CFLAGS = -Wall -Wextra -Werror -std=c++98 -g -fsanitize=address
-#CFLAGS = -Wall -Wextra -Werror -std=c++98 -g -fsanitize=address -DDEBUG_SERVER_MESSAGES
+#CFLAGS = -Wall -Wextra -Werror -std=c++98 -g -fsanitize=address
+CFLAGS = -Wall -Wextra -Werror -std=c++98 -g -fsanitize=address -DDEBUG_SERVER_MESSAGES
 
 RM = rm -rf
 

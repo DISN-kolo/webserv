@@ -5,6 +5,7 @@
 # include <sstream>
 # include <iostream>
 # include <string>
+# include <cstring>
 # include <algorithm>
 
 class RequestHeadParser

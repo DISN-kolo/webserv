@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(KA_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0), _rTarget("")
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(KA_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0), _rTarget(""), _isCgi(false), _firstTimeCgiSend(true)
 {
 }
 
@@ -21,6 +21,8 @@ Connect &Connect::operator=(const Connect & obj)
 	_remainingFileSize = obj.getRemainingFileSize();
 	_serverContext = obj.getServerContext();
 	_rTarget = obj.getRTarget();
+	_isCgi = obj.getIsCgi();
+	_firstTimeCgiSend = obj.getFirstTimeCgiSend();
 	return (*this);
 }
 
@@ -103,6 +105,16 @@ std::string	Connect::getRTarget(void) const
 	return (_rTarget);
 }
 
+bool	Connect::getIsCgi(void) const
+{
+	return (_isCgi);
+}
+
+bool	Connect::getFirstTimeCgiSend(void) const
+{
+	return (_firstTimeCgiSend);
+}
+
 // v for value lol
 void	Connect::setNeedsBody(bool v)
 {
@@ -174,6 +186,22 @@ void	Connect::setRTarget(std::string v)
 	_rTarget = v;
 }
 
+void	Connect::setIsCgi(bool v)
+{
+	_isCgi = v;
+}
+
+void	Connect::setFirstTimeCgiSend(bool v)
+{
+	_isCgi = v;
+}
+
+void	Connect::setPortInUse(int port)
+{
+	_serverContext.ports.clear();
+	_serverContext.ports.push_back(port);
+}
+
 void	Connect::eraseSendStr(size_t pos, size_t len)
 {
 	_sendStr.erase(pos, len);
@@ -189,10 +217,4 @@ void	Connect::diminishRemainingFileSize(int amt)
 	{
 		_remainingFileSize -= amt;
 	}
-}
-
-void	Connect::setPortInUse(int port)
-{
-	_serverContext.ports.clear();
-	_serverContext.ports.push_back(port);
 }

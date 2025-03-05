@@ -61,7 +61,7 @@ private:
 	std::vector<std::string>	_localRecvBuffers;
 	std::vector<std::string>	_localFWriteBuffers;
 	std::vector<size_t>			_fWCounts;
-	std::string					_localSendString;
+	std::vector<std::string>	_localSendStrings;
 	std::vector<Connect * >		_perConnArr;
 	int							_reuseAddressValue;
 	int 						_timeout;

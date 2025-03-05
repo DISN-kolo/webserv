@@ -31,6 +31,8 @@ private:
 	off_t					_remainingFileSize;
 	struct config_server_t	_serverContext;
 	std::string				_rTarget;
+	bool					_isCgi;
+	bool					_firstTimeCgiSend;
 public:
 	Connect();
 	~Connect();
@@ -49,6 +51,8 @@ public:
 	off_t					getRemainingFileSize(void) const;
 	struct config_server_t	getServerContext(void) const;
 	std::string				getRTarget(void) const;
+	bool					getIsCgi(void) const;
+	bool					getFirstTimeCgiSend(void) const;
 
 	void	setNeedsBody(bool v);
 	void	setContLen(size_t v);
@@ -64,6 +68,9 @@ public:
 	void	setRemainingFileSize(off_t v);
 	void	setServerContext(struct config_server_t v);
 	void	setRTarget(std::string v);
+	void	setIsCgi(bool v);
+	void	setFirstTimeCgiSend(bool v);
+
 	void	setPortInUse(int port);
 
 	void	eraseSendStr(size_t pos, size_t len);
