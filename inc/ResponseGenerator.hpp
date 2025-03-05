@@ -24,7 +24,7 @@ private:
 	std::string	_generateListing(std::string dirpath, std::string apparentTarget, struct config_server_t server);
 
 	char	**_env;
-	int		_execCGI(const RequestHeadParser &req);
+	int		_execCgi(const RequestHeadParser &req);
 
 	std::string	_text;
 	off_t		_fSize;

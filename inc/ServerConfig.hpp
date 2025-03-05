@@ -13,8 +13,6 @@ struct config_location_t {
 	std::string					root;
 	std::string					index;
 	bool						autoIndex;
-	std::vector<std::string>	cgiPath;
-	std::vector<std::string>	cgiExt;
 
 	bool						autoIndexF;
 };
@@ -56,8 +54,6 @@ class ServerConfig
 		void						_validateName(std::vector<std::string> values, int brackets);
 		void						_validatePort(std::vector<std::string> values, int brackets);
 		void						_validateMethods(std::vector<std::string> values, int brackets);
-		void						_validateCgiPath(std::vector<std::string> values, int brackets);
-		void						_validateCgiExt(std::vector<std::string> values, int brackets);
 		void						_validateErrorPage(std::vector<std::string> values, int brackets);
 		void						_validateReturn(std::vector<std::string> values, int brackets);
 
