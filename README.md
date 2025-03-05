@@ -35,5 +35,3 @@
 * root: mandatory
 * autoindex: default off
 * index: default index.html
-* cgi\_ext: default .php
-* cgi\_path: default /bin/php

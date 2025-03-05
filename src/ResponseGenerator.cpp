@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/04 19:31:18 by molasz-a         ###   ########.fr       */
+/*   Updated: 2025/03/05 15:04:40 by molasz-a         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -169,13 +169,12 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 #endif
 
 		struct stat	st;
-		if (!req.getCgiPath().empty())
-			_fd = _execCGI(req);
+		if (req.getIsCgi())
+			_fd = _execCgi(req);
 		else
 		{
 			int			statResponse;
 			statResponse = stat(req.getRTarget().c_str(), &st);
-			std::cout << req.getRTarget() << " " << statResponse << std::endl;
 			if (statResponse == -1)
 			{
 #ifdef DEBUG_SERVER_MESSAGES
@@ -390,11 +389,12 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 	return (ret);
 }
 
-int	ResponseGenerator::_execCGI(const RequestHeadParser &req)
+int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
 {
-	pid_t	pid;
-	int		fds[2], status;
-	char	*argv[3] = {(char *)req.getCgiPath().c_str(), (char *)req.getRTarget().c_str(), NULL};
+	pid_t		pid;
+	int			fds[2], status;
+	std::string	cgiPath = "/bin/php-cgi", reqRTarget = req.getRTarget();
+	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
 
 	if (pipe(fds) < 0)
 		throw internalServerError();
@@ -406,7 +406,7 @@ int	ResponseGenerator::_execCGI(const RequestHeadParser &req)
 		dup2(fds[1], STDOUT_FILENO);
 		close(fds[0]);
 		close(fds[1]);
-		execve(req.getCgiPath().c_str(), argv, _env);
+		execve("/bin/php-cgi", argv, _env);
 		exit(1);
 	}
 	waitpid(pid, &status, 0);
