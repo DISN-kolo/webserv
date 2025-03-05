@@ -213,10 +213,6 @@ void	ServerConfig::_validateConfigValues(const std::string &key, const std::vect
 			_validateMethods(values, brackets);
 		else if (key == "name")
 			_validateName(values, brackets);
-		else if (key == "cgi_path")
-			_validateCgiPath(values, brackets);
-		else if (key == "cgi_ext")
-			_validateCgiExt(values, brackets);	
 		else if (key == "return")
 			_validateReturn(values, brackets);
 		else
@@ -393,30 +389,6 @@ void	ServerConfig::_validateMethods(std::vector<std::string> values, int bracket
 	_config.back().locations.back().accMethods = values;
 }
 
-void	ServerConfig::_validateCgiPath(std::vector<std::string> values, int brackets)
-{
-	if (brackets != 2 || _config.back().locations.back().cgiPath.size())
-		throw configFileLineException();
-	_config.back().locations.back().cgiPath = values;
-}
-
-void	ServerConfig::_validateCgiExt(std::vector<std::string> values, int brackets)
-{
-	if (brackets != 2 || _config.back().locations.back().cgiExt.size())
-		throw configFileLineException();
-	for (std::vector<std::string>::iterator i = values.begin(); i != values.end(); i++)
-	{
-		if ((*i).length() >= 1 && (*i)[0] != '.')
-			throw configFileLineException();
-		for (int j = 1; (*i)[j]; j++)
-		{
-			if (!std::isalnum((*i)[j]))
-				throw configFileLineException();
-		}
-	}
-	_config.back().locations.back().cgiExt = values;
-}
-
 void	ServerConfig::_validateErrorPage(std::vector<std::string> values, int brackets)
 {
 	std::vector<std::pair<std::string, std::string> >	errors;
@@ -475,15 +447,6 @@ void	ServerConfig::_validateConfigRequirements()
 				j->accMethods.push_back("GET");
 			if (j->index.empty())
 				j->index = "index.html";
-			if (j->cgiPath.size() != j->cgiExt.size())
-			{
-				j->cgiExt.clear();
-				j->cgiPath.clear();
-			}
-			if (!j->cgiExt.size())
-				j->cgiExt.push_back(".php");
-			if (!j->cgiPath.size())
-				j->cgiPath.push_back("/bin/php-cgi");
 		}
 	}
 }

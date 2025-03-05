@@ -129,7 +129,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	_apparentTarget = "";
 	_redirection = false;
 	_dirlist = false;
-	_cgiPath = "";
+	_isCgi = false;
 	std::ostringstream	urlss;
 	urlss << "http://" + server.host + ":" << server.ports[0] << "/";
 //	_defaultContentPath = std::string("/tmp/var/www") + "/filesforserver";
@@ -264,8 +264,11 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			_rTarget = server.root + "/" + it->root + "/" + _rTarget;
 			// first, check if the result is a directory or not.
 			
-			if (_checkCgiExtension(*it))
-				return ;			
+			if (_rTarget.find(".php", _rTarget.length() - 4) != std::string::npos)
+			{
+				_isCgi = true;			
+				return ;
+			}
 
 			struct stat	st;
 			int			statResponse;
@@ -510,22 +513,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	}
 }
 
-bool	RequestHeadParser::_checkCgiExtension(struct config_location_t location)
-{
-	int	j = 0;
-
-	for (std::vector<std::string>::iterator i = location.cgiExt.begin(); i != location.cgiExt.end(); i++)
-	{
-		if (_rTarget.find(*i, _rTarget.length() - i->length()) != std::string::npos)
-		{
-			_cgiPath = location.cgiPath[j];
-			return (true);
-		}
-		j++;
-	}
-	return (false);
-}
-
 RequestHeadParser::~RequestHeadParser()
 {
 }
@@ -590,7 +577,7 @@ std::string	RequestHeadParser::getApparentTarget(void) const
 	return (_apparentTarget);
 }
 
-std::string	RequestHeadParser::getCgiPath(void) const
+bool	RequestHeadParser::getIsCgi(void) const
 {
-	return (_cgiPath);
+	return (_isCgi);
 }
