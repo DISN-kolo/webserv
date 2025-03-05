@@ -130,11 +130,10 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 	}
 }
 
-ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env, std::vector<std::string> envPaths)
+ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env)
 {
 	_server = server;
 	_env = env;
-	_envPaths = envPaths;
 	if (req.getDirlist())
 	{
 		std::string	listing = _generateListing(req.getRTarget(), req.getApparentTarget(), server);
@@ -171,7 +170,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 
 		struct stat	st;
 		if (!req.getCgiPath().empty())
-			_fd = _execCGI(req, server);
+			_fd = _execCGI(req);
 		else
 		{
 			int			statResponse;
@@ -238,10 +237,7 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 			throw internalServerError();
 		}
 
-		if (!req.getCgiPath().empty())
-			_fd = _execCGI(req, server);
-		else
-			_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
+		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
 		if (_fd == -1)
 		{
 #ifdef DEBUG_SERVER_MESSAGES
@@ -394,12 +390,11 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 	return (ret);
 }
 
-int	ResponseGenerator::_execCGI(const RequestHeadParser &req, const config_server_t &config)
+int	ResponseGenerator::_execCGI(const RequestHeadParser &req)
 {
 	pid_t	pid;
-	int		fds[2];
-	(void) config;
-	(void) req;
+	int		fds[2], status;
+	char	*argv[3] = {(char *)req.getCgiPath().c_str(), (char *)req.getRTarget().c_str(), NULL};
 
 	if (pipe(fds) < 0)
 		throw internalServerError();
@@ -408,14 +403,14 @@ int	ResponseGenerator::_execCGI(const RequestHeadParser &req, const config_serve
 		throw internalServerError();
 	if (!pid)
 	{
-		//dup2(fds[1], STDOUT_FILENO);
-		//close(fds[0]);
-		for (std::vector<std::string>::iterator i = _envPaths.begin(); i != _envPaths.end(); i++)
-		{
-			std::cout << "EXECV" << *i << " + " << req.getCgiPath() << std::endl;
-		}
+		dup2(fds[1], STDOUT_FILENO);
+		close(fds[0]);
+		close(fds[1]);
+		execve(req.getCgiPath().c_str(), argv, _env);
+		exit(1);
 	}
-	return (-1);
+	waitpid(pid, &status, 0);
+	return (fds[0]);
 }
 
 // dummy function. TODO

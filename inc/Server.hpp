@@ -50,10 +50,7 @@ private:
 	int		_blogSize;
 	int		_connsAmt;
 
-	char						**_env;
-	std::vector<std::string>	_envPaths;
-	void						_parseEnvPaths(void);
-
+	char	**_env;
 
 	// internal variables used for the run function and its subfunctions
 	struct pollfd				_socks[CONNS_AMT * 2];
