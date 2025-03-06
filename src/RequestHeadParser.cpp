@@ -126,6 +126,7 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t server)
 	:	_r(r)
 {
+	_kaTimeout = KA_TIME;
 	_apparentTarget = "";
 	_redirection = false;
 	_dirlist = false;

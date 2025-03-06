@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _kaTimeout(KA_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0), _rTarget(""), _isCgi(false), _firstTimeCgiSend(true)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _cgiTimeStarted(time(NULL)), _kaTimeout(KA_TIME), _cgiTimeout(CGI_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0), _rTarget(""), _isCgi(false), _firstTimeCgiSend(true), _pid(-2)
 {
 }
 
@@ -11,7 +11,9 @@ Connect &Connect::operator=(const Connect & obj)
 	_contLen = obj.getContLen();
 	_keepAlive = obj.getKeepAlive();
 	_timeStarted = obj.getTimeStarted();
+	_cgiTimeStarted = obj.getCgiTimeStarted();
 	_kaTimeout = obj.getKaTimeout();
+	_cgiTimeout = obj.getCgiTimeout();
 	_sendStr = obj.getSendStr();
 	_stillResponding = obj.getStillResponding();
 	_hasFile = obj.getHasFile();
@@ -23,6 +25,7 @@ Connect &Connect::operator=(const Connect & obj)
 	_rTarget = obj.getRTarget();
 	_isCgi = obj.getIsCgi();
 	_firstTimeCgiSend = obj.getFirstTimeCgiSend();
+	_pid = obj.getPid();
 	return (*this);
 }
 
@@ -47,7 +50,8 @@ size_t	Connect::getContLen(void) const
 
 bool	Connect::getKeepAlive(void) const
 {
-	return (_keepAlive);
+	//return (_keepAlive);
+	return (true);
 }
 
 time_t	Connect::getTimeStarted(void) const
@@ -55,9 +59,19 @@ time_t	Connect::getTimeStarted(void) const
 	return (_timeStarted);
 }
 
+time_t	Connect::getCgiTimeStarted(void) const
+{
+	return (_cgiTimeStarted);
+}
+
 time_t	Connect::getKaTimeout(void) const
 {
 	return (_kaTimeout);
+}
+
+time_t	Connect::getCgiTimeout(void) const
+{
+	return (_cgiTimeout);
 }
 
 std::string	Connect::getSendStr(void) const
@@ -115,6 +129,11 @@ bool	Connect::getFirstTimeCgiSend(void) const
 	return (_firstTimeCgiSend);
 }
 
+int		Connect::getPid(void) const
+{
+	return (_pid);
+}
+
 // v for value lol
 void	Connect::setNeedsBody(bool v)
 {
@@ -136,9 +155,19 @@ void	Connect::setTimeStarted(time_t v)
 	_timeStarted = v;
 }
 
+void	Connect::setCgiTimeStarted(time_t v)
+{
+	_cgiTimeStarted = v;
+}
+
 void	Connect::setKaTimeout(time_t v)
 {
 	_kaTimeout = v;
+}
+
+void	Connect::setCgiTimeout(time_t v)
+{
+	_cgiTimeout = v;
 }
 
 void	Connect::setSendStr(std::string v)
@@ -193,7 +222,12 @@ void	Connect::setIsCgi(bool v)
 
 void	Connect::setFirstTimeCgiSend(bool v)
 {
-	_isCgi = v;
+	_firstTimeCgiSend = v;
+}
+
+void	Connect::setPid(int v)
+{
+	_pid = v;
 }
 
 void	Connect::setPortInUse(int port)

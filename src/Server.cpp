@@ -109,6 +109,7 @@ int	Server::_checkAvailFdI(void) const
 
 void	Server::_purgeOneConnection(int i)
 {
+	_debugMsgI(i, "thou gotst purg'd!");
 	_localRecvBuffers[i].clear();
 	_localSendStrings[i].clear();
 	_localFWriteBuffers[i].clear();
@@ -183,12 +184,15 @@ void	Server::_cleanAfterNormalRead(int i)
 void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC)
 {
 	// TODO please check whether it's logical to do that here
+	std::cout << "NO WAY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << std::endl;
 	_perConnArr[i]->setTimeStarted(time(NULL));
 	if (_perConnArr[i]->getIsCgi())
 	{
 		_socks[i].events = POLLOUT;
 		_perConnArr[i]->setStillResponding(true);
 		_localSendStrings[i] = "";
+		_perConnArr[i]->setCgiTimeStarted(time(NULL));
+		_perConnArr[i]->setPid(rO->getPid());
 	}
 	else
 	{
@@ -387,22 +391,19 @@ void	Server::run(void)
 		{
 			throw pollError();
 		}
-		else if (_retCode == 0)
+		for (int i = _lstnN; i < _connsAmt; i++)
 		{
-			for (int i = _lstnN; i < _connsAmt; i++)
+			if (_perConnArr[i] != NULL)
 			{
-				if (_perConnArr[i] != NULL)
+				if ((!(_perConnArr[i]->getKeepAlive()) || (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()))
+						&& !(_perConnArr[i]->getStillResponding()) && !(_perConnArr[i]->getSendingFile()) && !(_perConnArr[i]->getWritingFile()))
 				{
-					if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
-							&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
-					{
-						_purgeOneConnection(i);
-					}
-					else
-					{
-						_debugMsgI(i, "not killed");
-						_debugMsgI(time(NULL) - _perConnArr[i]->getTimeStarted(), "<- alive for");
-					}
+					_purgeOneConnection(i);
+				}
+				else
+				{
+					_debugMsgI(i, "not killed");
+					_debugMsgI(time(NULL) - _perConnArr[i]->getTimeStarted(), "<- alive for");
 				}
 			}
 		}
@@ -438,6 +439,7 @@ void	Server::run(void)
 						while (_newConnect > 0)
 						{
 							_acceptNewConnect(i);
+							std::cout << "on accept, " << _perConnArr[i]->getKaTimeout() << std::endl;
 							if (_connectHereIndex != -1)
 							{
 								_newConnect = accept(_listenSocks[i], NULL, NULL);
@@ -540,6 +542,8 @@ void	Server::run(void)
 			} /* else if POLLIN */
 			else if ((_socks[i].revents & POLLOUT) == POLLOUT)
 			{
+				std::cout << "sending file: " << _perConnArr[i]->getSendingFile() << std::endl;
+				std::cout << "is cgi: " << _perConnArr[i]->getIsCgi() << std::endl;
 				// regular sends (not first sends)
 				// step 1. are we sending a file rn? no? well, just send the string that's saved in the perconarr[i]
 				if (!_perConnArr[i]->getSendingFile())
@@ -657,6 +661,7 @@ void	Server::run(void)
 					}
 					else if ((_socks[_tempFdI].revents & POLLIN) == POLLIN)
 					{
+						_debugMsgI(i, "pollin on tempfd sock");
 						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
 						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
 						if (_retCode < 0)
@@ -702,7 +707,7 @@ void	Server::run(void)
 							_perConnArr[i]->setFirstTimeCgiSend(false);
 							_perConnArr[i]->setTimeStarted(time(NULL));
 //							_localSendStrings[i] = "HTTP/1.1 " + /* XXX parsed status */ + CRLF;
-							_localSendStrings[i] = std::string("HTTP/1.1 200 OK");
+							_localSendStrings[i] = std::string("HTTP/1.1 200 OK") + CRLF;
 							_localSendStrings[i] += fileToReadBuf;
 							_debugMsgI(i, "hi! about to send this bad boy:");
 							std::cout << _localSendStrings[i].c_str() << std::endl;
@@ -765,19 +770,31 @@ void	Server::run(void)
 						}
 						else
 						{
-							_debugMsgI(i, "cgi not ready yet");
-							_debugMsgI(_tempFdI, "<- fd's index");
-							_debugMsgI(_socks[_tempFdI].fd, "<- cgi's fd");
-							continue ;
+							_debugMsgI(i, "cgi not ready yet or already done");
+							std::cout << time(NULL) << std::endl;
+							std::cout << _perConnArr[i]->getCgiTimeStarted() << std::endl;
+							std::cout << _perConnArr[i]->getCgiTimeout() << std::endl;
+							if (waitpid(_perConnArr[i]->getPid(), NULL, WNOHANG) == -1)
+							{
+								_debugMsgI(i, "child cgi died itself");
+								_purgeOneConnection(i);
+//								_perConnArr[i]->setTimeStarted(time(NULL));
+//								_cleanAfterNormalRead(i);
+//								_perConnArr[i]->setIsCgi(false);
+//								_perConnArr[i]->setFirstTimeCgiSend(true);
+							}
+							else if (time(NULL) - _perConnArr[i]->getCgiTimeStarted() > _perConnArr[i]->getCgiTimeout())
+							{
+								_debugMsgI(i, "child cgi killed manually by timeout");
+								kill(_perConnArr[i]->getPid(), 9);
+								_purgeOneConnection(i);
+//								_perConnArr[i]->setTimeStarted(time(NULL));
+//								_cleanAfterNormalRead(i);
+//								_perConnArr[i]->setIsCgi(false);
+//								_perConnArr[i]->setFirstTimeCgiSend(true);
+							}
 						}
 					}
-				}
-
-				// add a CGI-specific timeout checker to protect against infinite loops TODO
-				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
-						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()))
-				{
-					_purgeOneConnection(i);
 				}
 			} /* else if POLLOUT */
 		} /* for to iterate thru _socks upon poll's return */

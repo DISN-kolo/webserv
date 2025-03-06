@@ -3,10 +3,9 @@
 
 ### TODOs
 
-* CGI
-* CGI check for while true (add a timeout to cgi itself)
+* CGI post
+* CGI check for while true, add a timeout
 * binary data ?
-* check out the poll's limits on \_connsAmt. it gives an error if the total polling size is too big... ulimit -n?
 
 ### current bugs
 

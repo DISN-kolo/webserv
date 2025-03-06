@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/05 16:29:38 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/06 16:08:08 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,7 @@ ResponseGenerator::ResponseGenerator(int code)
 // for that, we need context
 ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t server)
 {
+	_pid = -2;
 	std::string	errFilePath = "";
 	std::string	errDirPath = "";
 	bool		errFileMatched = false;
@@ -132,6 +133,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env)
 {
+	_pid = -2;
 	_server = server;
 	_env = env;
 	if (req.getDirlist())
@@ -390,7 +392,7 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
 {
 	pid_t		pid;
-	int			fds[2], status;
+	int			fds[2];
 	std::string	cgiPath = "/bin/php-cgi", reqRTarget = req.getRTarget();
 	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
 
@@ -407,7 +409,7 @@ int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
 		execve("/bin/php-cgi", argv, _env);
 		exit(1);
 	}
-	waitpid(pid, &status, 0);
+	_pid = pid;
 	return (fds[0]);
 }
 
@@ -504,7 +506,7 @@ off_t	ResponseGenerator::getFSize(void) const
 	return (_fSize);
 }
 
-int	ResponseGenerator::getFd(void) const
+int		ResponseGenerator::getFd(void) const
 {
 	return (_fd);
 }
@@ -512,4 +514,9 @@ int	ResponseGenerator::getFd(void) const
 bool	ResponseGenerator::getHasFile(void) const
 {
 	return (_hasFile);
+}
+
+int		ResponseGenerator::getPid(void) const
+{
+	return (_pid);
 }
