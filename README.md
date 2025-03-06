@@ -3,13 +3,15 @@
 
 ### TODOs
 
+* CGI response parsing for http response code
 * CGI post
-* CGI check for while true, add a timeout
+* CGI check for while true, add a timeout response
+* graceful stop after ctrl c
 * binary data ?
 
 ### current bugs
 
-* ctrl+C in telnet/nc leads to a weird timeout situation? I guess. *Idk if that's an improper termination problem or the server's problem.*
+* none :)
 
 ### CONFIGURATION FILE
 
