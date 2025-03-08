@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/05 15:04:40 by molasz-a         ###   ########.fr       */
+/*   Updated: 2025/03/08 15:12:33 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,7 @@ ResponseGenerator::ResponseGenerator(int code)
 // for that, we need context
 ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t server)
 {
+	_pid = -2;
 	std::string	errFilePath = "";
 	std::string	errDirPath = "";
 	bool		errFileMatched = false;
@@ -132,6 +133,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env)
 {
+	_pid = -2;
 	_server = server;
 	_env = env;
 	if (req.getDirlist())
@@ -168,11 +170,11 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		std::cout << "it's a get of '" << req.getRTarget().c_str() << "'" << std::endl;
 #endif
 
-		struct stat	st;
 		if (req.getIsCgi())
 			_fd = _execCgi(req);
 		else
 		{
+			struct stat	st;
 			int			statResponse;
 			statResponse = stat(req.getRTarget().c_str(), &st);
 			if (statResponse == -1)
@@ -193,69 +195,62 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 				throw internalServerError();
 			}
 			_fd = open(req.getRTarget().c_str(), O_RDONLY);
-		}
-
-		if (_fd == -1)
-		{
+			_fSize = st.st_size;
+			_hasFile = true;
 #ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's an fd == -1" << std::endl;
-#endif
-			throw internalServerError();
-		}
-
-		_fSize = st.st_size;
-		_hasFile = true;
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << "epic! you've just opened a file to READ. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
+			std::cout << "epic! you've just opened a file to READ. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << ", and the size is " << _fSize << "." << std::endl;
 #endif
 
-		std::stringstream	ss;
-		ss << "HTTP/1.1 " << "200 OK" << CRLF;
-		ss << "Date: " << _getDate() << CRLF;
-		ss << "Server: " << _getServerName() << CRLF;
-		ss << "Content-Type: " << _getContentType() << CRLF;
-		ss << "Content-Length: " << _fSize << CRLF;
-		ss << CRLF;
-		_text = ss.str();
+			std::stringstream	ss;
+			ss << "HTTP/1.1 " << "200 OK" << CRLF;
+			ss << "Date: " << _getDate() << CRLF;
+			ss << "Server: " << _getServerName() << CRLF;
+			ss << "Content-Type: " << _getContentType() << CRLF;
+			ss << "Content-Length: " << _fSize << CRLF;
+			ss << CRLF;
+			_text = ss.str();
+			if (_fd == -1)
+			{
+#ifdef DEBUG_SERVER_MESSAGES
+				std::cout << "it's an fd == -1" << std::endl;
+#endif
+				throw internalServerError();
+			}
+		}
 	}
 	else if (req.getMethod() == "POST")
 	{
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "it's a post of '" << req.getRTarget().c_str() << "'" << std::endl;
 #endif
-		struct stat	st;
-		int			statResponse;
-		statResponse = stat(req.getRTarget().c_str(), &st);
-		if (statResponse != -1)
+		if (req.getIsCgi())
+			_fd = _execCgi(req);
+		else
 		{
-			// FIXME update existing file instead? idk lol
-			// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's a stat != -1: file exists already. idk" << std::endl;
-#endif
-			throw internalServerError();
+			struct stat	st;
+			int			statResponse;
+			statResponse = stat(req.getRTarget().c_str(), &st);
+			if (statResponse != -1)
+			{
+				// FIXME update existing file instead? idk lol
+				// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
+				throw internalServerError();
+			}
+
+			_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
+			if (_fd == -1)
+			{
+				throw internalServerError();
+			}
+
+			std::stringstream	ss;
+			ss << "HTTP/1.1 " << "201 Created" << CRLF;
+			ss << "Date: " << _getDate() << CRLF;
+			ss << "Server: " << _getServerName() << CRLF;
+			ss << "Content-Location: " << req.getUrl() << CRLF;
+			ss << CRLF;
+			_text = ss.str();
 		}
-
-		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
-		if (_fd == -1)
-		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's an fd == -1" << std::endl;
-#endif
-			throw internalServerError();
-		}
-
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << "epic! you've just opened a file to WRITE. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << "." << std::endl;
-#endif
-
-		std::stringstream	ss;
-		ss << "HTTP/1.1 " << "201 Created" << CRLF;
-		ss << "Date: " << _getDate() << CRLF;
-		ss << "Server: " << _getServerName() << CRLF;
-		ss << "Content-Location: " << req.getUrl() << CRLF;
-		ss << CRLF;
-		_text = ss.str();
 	}
 	else if (req.getMethod() == "DELETE")
 	{
@@ -392,7 +387,7 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
 {
 	pid_t		pid;
-	int			fds[2], status;
+	int			fds[2];
 	std::string	cgiPath = "/bin/php-cgi", reqRTarget = req.getRTarget();
 	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
 
@@ -409,7 +404,7 @@ int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
 		execve("/bin/php-cgi", argv, _env);
 		exit(1);
 	}
-	waitpid(pid, &status, 0);
+	_pid = pid;
 	return (fds[0]);
 }
 
@@ -506,7 +501,7 @@ off_t	ResponseGenerator::getFSize(void) const
 	return (_fSize);
 }
 
-int	ResponseGenerator::getFd(void) const
+int		ResponseGenerator::getFd(void) const
 {
 	return (_fd);
 }
@@ -514,4 +509,9 @@ int	ResponseGenerator::getFd(void) const
 bool	ResponseGenerator::getHasFile(void) const
 {
 	return (_hasFile);
+}
+
+int		ResponseGenerator::getPid(void) const
+{
+	return (_pid);
 }

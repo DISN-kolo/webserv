@@ -30,6 +30,7 @@ private:
 	off_t		_fSize;
 	int			_fd;
 	bool		_hasFile;
+	int			_pid;
 
 	struct config_server_t	_server;
 public:
@@ -43,5 +44,6 @@ public:
 	off_t		getFSize(void) const;
 	int			getFd(void) const;
 	bool		getHasFile(void) const;
+	int			getPid(void) const;
 } ;
 #endif

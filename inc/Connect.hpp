@@ -21,7 +21,9 @@ private:
 	size_t					_contLen;
 	bool					_keepAlive;
 	time_t					_timeStarted;
+	time_t					_cgiTimeStarted;
 	time_t					_kaTimeout;
+	time_t					_cgiTimeout;
 	std::string				_sendStr;
 	bool					_stillResponding;
 	bool					_hasFile;
@@ -31,6 +33,9 @@ private:
 	off_t					_remainingFileSize;
 	struct config_server_t	_serverContext;
 	std::string				_rTarget;
+	bool					_isCgi;
+	bool					_firstTimeCgiSend;
+	int						_pid;
 public:
 	Connect();
 	~Connect();
@@ -39,7 +44,9 @@ public:
 	size_t					getContLen(void) const;
 	bool					getKeepAlive(void) const;
 	time_t					getTimeStarted(void) const;
+	time_t					getCgiTimeStarted(void) const;
 	time_t					getKaTimeout(void) const;
+	time_t					getCgiTimeout(void) const;
 	std::string				getSendStr(void) const;
 	bool					getStillResponding(void) const;
 	bool					getHasFile(void) const;
@@ -49,12 +56,17 @@ public:
 	off_t					getRemainingFileSize(void) const;
 	struct config_server_t	getServerContext(void) const;
 	std::string				getRTarget(void) const;
+	bool					getIsCgi(void) const;
+	bool					getFirstTimeCgiSend(void) const;
+	int						getPid(void) const;
 
 	void	setNeedsBody(bool v);
 	void	setContLen(size_t v);
 	void	setKeepAlive(bool v);
 	void	setTimeStarted(time_t v);
+	void	setCgiTimeStarted(time_t v);
 	void	setKaTimeout(time_t v);
+	void	setCgiTimeout(time_t v);
 	void	setSendStr(std::string v);
 	void	setStillResponding(bool v);
 	void	setHasFile(bool v);
@@ -64,6 +76,10 @@ public:
 	void	setRemainingFileSize(off_t v);
 	void	setServerContext(struct config_server_t v);
 	void	setRTarget(std::string v);
+	void	setIsCgi(bool v);
+	void	setFirstTimeCgiSend(bool v);
+	void	setPid(int v);
+
 	void	setPortInUse(int port);
 
 	void	eraseSendStr(size_t pos, size_t len);
