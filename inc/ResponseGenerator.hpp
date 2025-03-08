@@ -23,8 +23,10 @@ private:
 
 	std::string	_generateListing(std::string dirpath, std::string apparentTarget, struct config_server_t server);
 
-	char	**_env;
-	int		_execCgi(const RequestHeadParser &req);
+	std::string					_bodyStr;
+	std::vector<std::string>	_env;
+	char						**_generateEnv(void);
+	int							_execCgi(const RequestHeadParser &req);
 
 	std::string	_text;
 	off_t		_fSize;
@@ -36,7 +38,7 @@ private:
 public:
 	ResponseGenerator(int code);
 	ResponseGenerator(const char * ewhat, struct config_server_t server);
-	ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env);
+	ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, std::vector<std::string> env);
 	~ResponseGenerator();
 
 	std::string	getText(void) const;
