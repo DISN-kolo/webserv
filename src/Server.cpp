@@ -151,7 +151,10 @@ void	Server::_responseObjectHasAFile(int i, ResponseGenerator *responseObject)
 void	Server::_contentTooBigHandilng(int i)
 {
 	// erroneous request means file deletion.
-	remove(_perConnArr[i]->getRTarget().c_str());
+	if (!_perConnArr[i]->getIsCgi())
+	{
+		remove(_perConnArr[i]->getRTarget().c_str());
+	}
 	_cleanAfterCatching(i);
 	_debugMsgI(i, "Content size is too big, sending a 400");
 	ResponseGenerator	responseObject("400 Bad Request", _perConnArr[i]->getServerContext());
@@ -200,13 +203,11 @@ std::string	Server::_parseCgiStatus(char * fbuf)
 	{
 		ret = b.substr(stPos + 8, nlPos - stPos - 8);
 	}
-//	std::cout << "returning from parsing cgi status with " << ret << std::endl;
 	return (ret);
 }
 
 void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC)
 {
-	// TODO please check whether it's logical to do that here
 	_perConnArr[i]->setTimeStarted(time(NULL));
 	if (_perConnArr[i]->getIsCgi())
 	{
@@ -247,33 +248,51 @@ void	Server::_onHeadLocated(int i)
 {
 	try
 	{
+		std::cout << "NICE TRY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" <<std::endl;
 		RequestHeadParser		req(_localRecvBuffers[i], _perConnArr[i]->getServerContext());
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
 		_perConnArr[i]->setIsCgi(req.getIsCgi());
 		if (req.getMethod() == "POST")
 		{
-			// this is for file deletion purposes in case of fail
-			_perConnArr[i]->setRTarget(req.getRTarget());
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
-			_perConnArr[i]->setNeedsBody(true);
-			_perConnArr[i]->setContLen(req.getContLen());
-			if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
+			if (_perConnArr[i]->getIsCgi())
 			{
-				remove(_perConnArr[i]->getRTarget().c_str());
-				throw contentTooLarge();
+				// upon cgi: don't read and write to file. eliminate the header, collect ALL the body and THEN generate the response.
+				_perConnArr[i]->setRTarget(req.getRTarget());
+				_perConnArr[i]->setNeedsBody(true);
+				_debugMsgI(req.getContLen(), "<- cont len");
+				_perConnArr[i]->setContLen(req.getContLen());
+				if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
+				{
+					throw contentTooLarge();
+				}
+				_eraseDoubleNlInLocalRecvBuffer(i);
+				// local fw buffers now only serves the body collection function. we will not use it to write anything.
 			}
-			_eraseDoubleNlInLocalRecvBuffer(i);
-			_localFWriteBuffers[i] = _localRecvBuffers[i];
-			_localRecvBuffers[i].clear();
+			else
+			{
+				// this is for file deletion purposes in case of fail
+				_perConnArr[i]->setRTarget(req.getRTarget());
+				ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
+				_perConnArr[i]->setNeedsBody(true);
+				_perConnArr[i]->setContLen(req.getContLen());
+				if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize && !_perConnArr[i]->getIsCgi())
+				{
+					remove(_perConnArr[i]->getRTarget().c_str());
+					throw contentTooLarge();
+				}
+				_eraseDoubleNlInLocalRecvBuffer(i);
+				_localFWriteBuffers[i] = _localRecvBuffers[i];
+				_localRecvBuffers[i].clear();
 
-			_perConnArr[i]->setWritingFile(true);
-			_tempFdI = i + _connsAmt;
-			_socks[_tempFdI].fd = responseObject.getFd();
-			_socks[_tempFdI].events = POLLOUT;
-			_perConnArr[i]->setFd(responseObject.getFd());
-			// this sets up a 201 response
-			_perConnArr[i]->setSendStr(responseObject.getText());
+				_perConnArr[i]->setWritingFile(true);
+				_tempFdI = i + _connsAmt;
+				_socks[_tempFdI].fd = responseObject.getFd();
+				_socks[_tempFdI].events = POLLOUT;
+				_perConnArr[i]->setFd(responseObject.getFd());
+				// this sets up a 201 response
+				_perConnArr[i]->setSendStr(responseObject.getText());
+			}
 		}
 		else if (req.getMethod() == "GET")
 		{
@@ -479,7 +498,7 @@ void	Server::run(void)
 				}
 				else
 				{
-					// we have something on a norlam socket
+					// we have something on a normal socket
 					std::memset(buf, 0, sizeof (buf));
 					_retCode = recv(_socks[i].fd, buf, _rbufSize, 0);
 					if (_retCode < 0)
@@ -496,12 +515,19 @@ void	Server::run(void)
 							{
 								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 								{
+									std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
 									_contentTooBigHandilng(i);
 								}
 								else if (_perConnArr[i]->getContLen() == _localRecvBuffers[i].size())
 								{
 									// it seems that we're done reading the body then.
 									_perConnArr[i]->setNeedsBody(false);
+									if (_perConnArr[i]->getIsCgi())
+									{
+										ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+										_responseObjectHasAFile(i, &rO);
+										_firstTimeSender(&rO, i, false, true);
+									}
 								}
 								// else -- nothing. just wait.
 							}
@@ -544,12 +570,19 @@ void	Server::run(void)
 						{
 							if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 							{
+								std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
 								_contentTooBigHandilng(i);
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
 								_localFWriteBuffers[i] += std::string(buf);
 								_perConnArr[i]->setNeedsBody(false);
+								if (_perConnArr[i]->getIsCgi())
+								{
+									ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+									_responseObjectHasAFile(i, &rO);
+									_firstTimeSender(&rO, i, false, true);
+								}
 							}
 							else
 							{
@@ -851,7 +884,7 @@ void	Server::run(void)
 				_perConnArr[i - _connsAmt]->setNeedsBody(false);
 				_perConnArr[i - _connsAmt]->setStillResponding(true);
 			}
-			else if (_fWCounts[i - _connsAmt] > _perConnArr[i - _connsAmt]->getContLen())
+			else if (_fWCounts[i - _connsAmt] > _perConnArr[i - _connsAmt]->getContLen() && !_perConnArr[i - _connsAmt]->getIsCgi())
 			{
 				_debugMsgI(i, "too much data. deleting the file");
 				remove(_perConnArr[i]->getRTarget().c_str());
