@@ -11,7 +11,8 @@
 
 ### current bugs
 
-* none :)
+* weird dangling stuff in i.php for example, at the end of the "view source" after the \</html\> already happened
+* CGI buffering size and send's crash in strange cases that we can't reproduce on 42's macs
 
 ### CONFIGURATION FILE
 

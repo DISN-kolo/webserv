@@ -179,18 +179,34 @@ void	Server::_cleanAfterNormalRead(int i)
 	_localSendStrings[i].clear();
 }
 
-// FIXME erroneously sends without actually polling for POLLOUT first.
-//must only set the flags and fill the local strings.
+std::string	Server::_parseCgiStatus(char * fbuf)
+{
+	std::string	b(fbuf);
+	size_t		stPos = b.find("Status: ");
+	size_t		nlPos = b.find("\n", stPos);
+	std::string	ret;
+	if (stPos == std::string::npos)
+	{
+		ret = "200 OK";
+	}
+	else
+	{
+		ret = b.substr(stPos + 8, nlPos - stPos - 8);
+	}
+//	std::cout << "returning from parsing cgi status with " << ret << std::endl;
+	return (ret);
+}
+
 void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC)
 {
 	// TODO please check whether it's logical to do that here
-	std::cout << "NO WAY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " << std::endl;
 	_perConnArr[i]->setTimeStarted(time(NULL));
 	if (_perConnArr[i]->getIsCgi())
 	{
 		_socks[i].events = POLLOUT;
 		_perConnArr[i]->setStillResponding(true);
-		_localSendStrings[i] = "";
+		_localSendStrings[i].clear();
+		_localFWriteBuffers[i].clear();
 		_perConnArr[i]->setCgiTimeStarted(time(NULL));
 		_perConnArr[i]->setPid(rO->getPid());
 	}
@@ -294,6 +310,9 @@ void	Server::_acceptNewConnect(int i)
 	_socks[_connectHereIndex].events = POLLIN;
 	_perConnArr[_connectHereIndex] = new Connect;
 	_perConnArr[_connectHereIndex]->setServerContext(_perConnArr[i]->getServerContext());
+	_localSendStrings[i].clear();
+	_localFWriteBuffers[i].clear();
+	_fWCounts[i] = 0;
 	_connectHereIndex = _checkAvailFdI();
 }
 
@@ -551,27 +570,16 @@ void	Server::run(void)
 					if (static_cast<size_t>(_sbufSize) < _perConnArr[i]->getSendStr().size())
 					{
 						_perConnArr[i]->setTimeStarted(time(NULL));
-						_debugMsgI(i, "reset starting time");
 						_localSendStrings[i] = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
 						send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 
 						_perConnArr[i]->eraseSendStr(0, _sbufSize);
-
-						_debugMsgI(i, "the text that was sent:");
-#ifdef DEBUG_SERVER_MESSAGES
-						std::cout << _localSendStrings[i] << std::endl;
-#endif
 					}
 					else
 					{
 						_perConnArr[i]->setTimeStarted(time(NULL));
-						_debugMsgI(i, "reset starting time");
 						send(_socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
 						_perConnArr[i]->setStillResponding(false);
-						_debugMsgI(i, "sent in one go or remaints:");
-#ifdef DEBUG_SERVER_MESSAGES
-						std::cout << _perConnArr[i]->getSendStr() << std::endl;
-#endif
 						_perConnArr[i]->eraseSendStr(0, _perConnArr[i]->getSendStr().size());
 						// maybe, cgi send needs to have its own flag XXX
 						if (_perConnArr[i]->getHasFile())
@@ -610,19 +618,15 @@ void	Server::run(void)
 						{
 							// we somehow had something from poll but showed up with 0 bytes upon actual reading.
 							_perConnArr[i]->setTimeStarted(time(NULL));
-							_debugMsgI(i, "ABSOLUTELY done reading from the asked file");
 							_cleanAfterNormalRead(i);
 						}
 						else if (_perConnArr[i]->getRemainingFileSize() == _retCode)
 						{
 							// the amount of file left is exactly the amount that was read. ggs
 							_perConnArr[i]->setTimeStarted(time(NULL));
-							_debugMsgI(i, "the intended way of finishing reading a file reached.");
 							fileToReadBuf[_retCode] = 0;
 							_localSendStrings[i] = std::string(fileToReadBuf);
 							send(_socks[i].fd, _localSendStrings[i].c_str(), _retCode + 1, 0);
-							_debugMsgI(i, "the last file part that was sent:");
-							_debugMsgI(i, _localSendStrings[i]);
 							_cleanAfterNormalRead(i);
 						}
 						else
@@ -687,30 +691,22 @@ void	Server::run(void)
 								{
 									_localSendStrings[i].erase(0, _sbufSize);
 								}
-
-								_debugMsgI(i, "the cgi part that was sent:");
-								_debugMsgI(i, _localSendStrings[i]);
 							}
 							else
 							{
 								_perConnArr[i]->setTimeStarted(time(NULL));
-								_debugMsgI(i, "ABSOLUTELY done reading from the cgi");
 								_cleanAfterNormalRead(i);
+								// TODO close connection?
 							}
 						}
 						else if (_perConnArr[i]->getFirstTimeCgiSend())
 						{
-							std::cout << "retcode:" << _retCode << std::endl;
-							std::cout << "sizeof:" << sizeof (fileToReadBuf) << std::endl;
-							std::cout << "sbufsize:" << _sbufSize << std::endl;
 							fileToReadBuf[_retCode] = 0;
 							_perConnArr[i]->setFirstTimeCgiSend(false);
 							_perConnArr[i]->setTimeStarted(time(NULL));
-//							_localSendStrings[i] = "HTTP/1.1 " + /* XXX parsed status */ + CRLF;
-							_localSendStrings[i] = std::string("HTTP/1.1 200 OK") + CRLF;
+							_localSendStrings[i] = std::string("HTTP/1.1 ") + _parseCgiStatus(fileToReadBuf) + CRLF;
+//							_localSendStrings[i] = std::string("HTTP/1.1 200 OK") + CRLF;
 							_localSendStrings[i] += fileToReadBuf;
-							_debugMsgI(i, "hi! about to send this bad boy:");
-							std::cout << _localSendStrings[i].c_str() << std::endl;
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
 								send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
@@ -721,10 +717,6 @@ void	Server::run(void)
 								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
-							// XXX cgi parsing here
-							// XXX adding headers before the cgi's response headers here
-							// XXX because we'll have more content than possibly the buffer size, localsendstring could be sent incorrectly
-							//thus we need to send it in parts up to sbuf size, like the usual sends
 						}
 						else
 						{
@@ -742,16 +734,12 @@ void	Server::run(void)
 							{
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
-
-							_debugMsgI(i, "the cgi part that was sent:");
-							_debugMsgI(i, _localSendStrings[i]);
 						}
 					}
 					else
 					{
 						if (!_localSendStrings[i].empty())
 						{
-							_debugMsgI(i, "entered in the CGI not ready state with some dangling tail");
 							// the remnants
 							_perConnArr[i]->setTimeStarted(time(NULL));
 
@@ -764,9 +752,6 @@ void	Server::run(void)
 							{
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
-
-							_debugMsgI(i, "the cgi part that was sent:");
-							_debugMsgI(i, _localSendStrings[i]);
 						}
 						else
 						{
@@ -774,24 +759,19 @@ void	Server::run(void)
 							std::cout << time(NULL) << std::endl;
 							std::cout << _perConnArr[i]->getCgiTimeStarted() << std::endl;
 							std::cout << _perConnArr[i]->getCgiTimeout() << std::endl;
+							std::cout << _perConnArr[i]->getTimeStarted() << std::endl;
+							std::cout << _perConnArr[i]->getKaTimeout() << std::endl;
 							if (waitpid(_perConnArr[i]->getPid(), NULL, WNOHANG) == -1)
 							{
 								_debugMsgI(i, "child cgi died itself");
 								_purgeOneConnection(i);
-//								_perConnArr[i]->setTimeStarted(time(NULL));
-//								_cleanAfterNormalRead(i);
-//								_perConnArr[i]->setIsCgi(false);
-//								_perConnArr[i]->setFirstTimeCgiSend(true);
 							}
 							else if (time(NULL) - _perConnArr[i]->getCgiTimeStarted() > _perConnArr[i]->getCgiTimeout())
 							{
 								_debugMsgI(i, "child cgi killed manually by timeout");
 								kill(_perConnArr[i]->getPid(), 9);
-								_purgeOneConnection(i);
-//								_perConnArr[i]->setTimeStarted(time(NULL));
-//								_cleanAfterNormalRead(i);
-//								_perConnArr[i]->setIsCgi(false);
-//								_perConnArr[i]->setFirstTimeCgiSend(true);
+								// TODO 408 here
+//								_purgeOneConnection(i);
 							}
 						}
 					}
@@ -801,7 +781,7 @@ void	Server::run(void)
 		// time to iterate thru the files! (or the cgis)
 		for (int i = _connsAmt; i < _connsAmt * 2; i++)
 		{
-			if (_socks[i].fd == -1 || ((_socks[i].events & POLLIN) == POLLIN))
+			if (_socks[i].fd == -1 || ((_socks[i].events & POLLIN) == POLLIN) || (_perConnArr[i - _connsAmt] != NULL && _perConnArr[i - _connsAmt]->getIsCgi()))
 			{
 				// pollin is done in the socket part
 				continue ;
