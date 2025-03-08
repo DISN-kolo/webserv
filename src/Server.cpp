@@ -194,13 +194,11 @@ std::string	Server::_parseCgiStatus(char * fbuf)
 	{
 		ret = b.substr(stPos + 8, nlPos - stPos - 8);
 	}
-//	std::cout << "returning from parsing cgi status with " << ret << std::endl;
 	return (ret);
 }
 
 void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC)
 {
-	// TODO please check whether it's logical to do that here
 	_perConnArr[i]->setTimeStarted(time(NULL));
 	if (_perConnArr[i]->getIsCgi())
 	{
@@ -247,27 +245,43 @@ void	Server::_onHeadLocated(int i)
 		_perConnArr[i]->setIsCgi(req.getIsCgi());
 		if (req.getMethod() == "POST")
 		{
-			// this is for file deletion purposes in case of fail
-			_perConnArr[i]->setRTarget(req.getRTarget());
-			ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
-			_perConnArr[i]->setNeedsBody(true);
-			_perConnArr[i]->setContLen(req.getContLen());
-			if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
+			if (_perConnArr[i]->getIsCgi())
 			{
-				remove(_perConnArr[i]->getRTarget().c_str());
-				throw contentTooLarge();
+				// upon cgi: don't read and write to file. eliminate the header, collect ALL the body and THEN generate the response.
+				_perConnArr[i]->setRTarget(req.getRTarget());
+				_perConnArr[i]->setNeedsBody(true);
+				_perConnArr[i]->setContLen(req.getContLen());
+				if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
+				{
+					throw contentTooLarge();
+				}
+				_eraseDoubleNlInLocalRecvBuffer(i);
+				// local fw buffers now only serves the body collection function. we will not use it to write anything.
 			}
-			_eraseDoubleNlInLocalRecvBuffer(i);
-			_localFWriteBuffers[i] = _localRecvBuffers[i];
-			_localRecvBuffers[i].clear();
+			else
+			{
+				// this is for file deletion purposes in case of fail
+				_perConnArr[i]->setRTarget(req.getRTarget());
+				ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
+				_perConnArr[i]->setNeedsBody(true);
+				_perConnArr[i]->setContLen(req.getContLen());
+				if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
+				{
+					remove(_perConnArr[i]->getRTarget().c_str());
+					throw contentTooLarge();
+				}
+				_eraseDoubleNlInLocalRecvBuffer(i);
+				_localFWriteBuffers[i] = _localRecvBuffers[i];
+				_localRecvBuffers[i].clear();
 
-			_perConnArr[i]->setWritingFile(true);
-			_tempFdI = i + _connsAmt;
-			_socks[_tempFdI].fd = responseObject.getFd();
-			_socks[_tempFdI].events = POLLOUT;
-			_perConnArr[i]->setFd(responseObject.getFd());
-			// this sets up a 201 response
-			_perConnArr[i]->setSendStr(responseObject.getText());
+				_perConnArr[i]->setWritingFile(true);
+				_tempFdI = i + _connsAmt;
+				_socks[_tempFdI].fd = responseObject.getFd();
+				_socks[_tempFdI].events = POLLOUT;
+				_perConnArr[i]->setFd(responseObject.getFd());
+				// this sets up a 201 response
+				_perConnArr[i]->setSendStr(responseObject.getText());
+			}
 		}
 		else if (req.getMethod() == "GET")
 		{
@@ -473,7 +487,7 @@ void	Server::run(void)
 				}
 				else
 				{
-					// we have something on a norlam socket
+					// we have something on a normal socket
 					std::memset(buf, 0, sizeof (buf));
 					_retCode = recv(_socks[i].fd, buf, _rbufSize, 0);
 					if (_retCode < 0)
@@ -496,6 +510,9 @@ void	Server::run(void)
 								{
 									// it seems that we're done reading the body then.
 									_perConnArr[i]->setNeedsBody(false);
+
+									// XXX if cgi => make a cgi post responsegenerator object, passing it the body.
+									// XXX set appropriate flags to get ready for sending the cgi's response.
 								}
 								// else -- nothing. just wait.
 							}
@@ -544,6 +561,8 @@ void	Server::run(void)
 							{
 								_localFWriteBuffers[i] += std::string(buf);
 								_perConnArr[i]->setNeedsBody(false);
+								// XXX if cgi => make a cgi post responsegenerator object, passing it the body.
+								// XXX set appropriate flags to get ready for sending the cgi's response.
 							}
 							else
 							{
