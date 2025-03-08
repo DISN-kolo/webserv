@@ -3,7 +3,6 @@
 
 ### TODOs
 
-* CGI response parsing for http response code
 * CGI post
 * CGI check for while true, add a timeout response
 * graceful stop after ctrl c

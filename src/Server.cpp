@@ -169,6 +169,7 @@ void	Server::_cleanAfterCatching(int i)
 
 void	Server::_cleanAfterNormalRead(int i)
 {
+	_tempFdI = i + _connsAmt;
 	close(_socks[_tempFdI].fd);
 	_socks[_tempFdI].fd = -1;
 
@@ -705,7 +706,6 @@ void	Server::run(void)
 							_perConnArr[i]->setFirstTimeCgiSend(false);
 							_perConnArr[i]->setTimeStarted(time(NULL));
 							_localSendStrings[i] = std::string("HTTP/1.1 ") + _parseCgiStatus(fileToReadBuf) + CRLF;
-//							_localSendStrings[i] = std::string("HTTP/1.1 200 OK") + CRLF;
 							_localSendStrings[i] += fileToReadBuf;
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
@@ -768,9 +768,19 @@ void	Server::run(void)
 							}
 							else if (time(NULL) - _perConnArr[i]->getCgiTimeStarted() > _perConnArr[i]->getCgiTimeout())
 							{
-								_debugMsgI(i, "child cgi killed manually by timeout");
 								kill(_perConnArr[i]->getPid(), 9);
-								// TODO 408 here
+								_debugMsgI(i, "child cgi killed manually by timeout");
+								// socks events is already pollout
+								_cleanAfterCatching(i);
+								_perConnArr[i]->setIsCgi(false);
+								_perConnArr[i]->setFirstTimeCgiSend(true);
+								ResponseGenerator	responseObject("502 Bad Gateway", _perConnArr[i]->getServerContext());
+								if (responseObject.getHasFile())
+								{
+									_responseObjectHasAFile(i, &responseObject);
+								}
+
+								_firstTimeSender(&responseObject, i, true, true);
 //								_purgeOneConnection(i);
 							}
 						}
