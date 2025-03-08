@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/08 15:58:34 by molasz-a         ###   ########.fr       */
+/*   Updated: 2025/03/08 17:08:29 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -133,6 +133,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, std::vector<std::string> env)
 {
+	_bodyStr = "";
 	_pid = -2;
 	_server = server;
 	_env = env;
@@ -171,7 +172,10 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 #endif
 
 		if (req.getIsCgi())
-			_fd = _execCgi(req);
+		{
+			_fd = _execCgi(req.getRTarget());
+			_hasFile = true;
+		}
 		else
 		{
 			struct stat	st;
@@ -223,34 +227,29 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "it's a post of '" << req.getRTarget().c_str() << "'" << std::endl;
 #endif
-		if (req.getIsCgi())
-			_fd = _execCgi(req);
-		else
+		struct stat	st;
+		int			statResponse;
+		statResponse = stat(req.getRTarget().c_str(), &st);
+		if (statResponse != -1)
 		{
-			struct stat	st;
-			int			statResponse;
-			statResponse = stat(req.getRTarget().c_str(), &st);
-			if (statResponse != -1)
-			{
-				// FIXME update existing file instead? idk lol
-				// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
-				throw internalServerError();
-			}
-
-			_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
-			if (_fd == -1)
-			{
-				throw internalServerError();
-			}
-
-			std::stringstream	ss;
-			ss << "HTTP/1.1 " << "201 Created" << CRLF;
-			ss << "Date: " << _getDate() << CRLF;
-			ss << "Server: " << _getServerName() << CRLF;
-			ss << "Content-Location: " << req.getUrl() << CRLF;
-			ss << CRLF;
-			_text = ss.str();
+			// FIXME update existing file instead? idk lol
+			// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
+			throw internalServerError();
 		}
+
+		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
+		if (_fd == -1)
+		{
+			throw internalServerError();
+		}
+
+		std::stringstream	ss;
+		ss << "HTTP/1.1 " << "201 Created" << CRLF;
+		ss << "Date: " << _getDate() << CRLF;
+		ss << "Server: " << _getServerName() << CRLF;
+		ss << "Content-Location: " << req.getUrl() << CRLF;
+		ss << CRLF;
+		_text = ss.str();
 	}
 	else if (req.getMethod() == "DELETE")
 	{
@@ -297,6 +296,14 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		ss << CRLF;
 		_text = ss.str();
 	}
+}
+
+ResponseGenerator::ResponseGenerator(std::string body, std::string rTarget, std::vector<std::string> env)
+{
+	_env = env;
+	_bodyStr = body;
+	_fd = _execCgi(rTarget);
+	_hasFile = true;
 }
 
 ResponseGenerator::ResponseGenerator(const ResponseGenerator & obj)
@@ -390,8 +397,10 @@ char	**ResponseGenerator::_generateEnv(void)
 
 	if (!_bodyStr.empty())
 	{
-		for (size_t i = 0; i < _bodyStr.size(); i++) {
-			if (_bodyStr[i] == '&') {
+		for (size_t i = 0; i < _bodyStr.size(); i++)
+		{
+			if (_bodyStr[i] == '&')
+			{
 				_env.push_back(_bodyStr.substr(j, i));
 				j = i + 1;
 			}
@@ -403,18 +412,20 @@ char	**ResponseGenerator::_generateEnv(void)
 	char	**env = new char*[_env.size() + 1];
 
 	j = 0;
-	for (std::vector<std::string>::iterator i = _env.begin(); i != _env.end(); i++) {
+	for (std::vector<std::string>::iterator i = _env.begin(); i != _env.end(); i++)
+	{
 		env[j] = new char[i->size() + 1];
 		env[j++] = const_cast<char *>(i->c_str());
 	}
+	env[j] = NULL;
 	return env;
 }
 
-int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
+int	ResponseGenerator::_execCgi(std::string rTarget)
 {
 	pid_t		pid;
 	int			fds[2];
-	std::string	cgiPath = "/bin/php-cgi", reqRTarget = req.getRTarget();
+	std::string	cgiPath = "/bin/php-cgi", reqRTarget = rTarget;
 	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
 	char		**env;
 

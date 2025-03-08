@@ -26,7 +26,7 @@ private:
 	std::string					_bodyStr;
 	std::vector<std::string>	_env;
 	char						**_generateEnv(void);
-	int							_execCgi(const RequestHeadParser &req);
+	int							_execCgi(std::string rTarget);
 
 	std::string	_text;
 	off_t		_fSize;
@@ -39,6 +39,7 @@ public:
 	ResponseGenerator(int code);
 	ResponseGenerator(const char * ewhat, struct config_server_t server);
 	ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, std::vector<std::string> env);
+	ResponseGenerator(std::string body, std::string rTarget, std::vector<std::string> env);
 	~ResponseGenerator();
 
 	std::string	getText(void) const;

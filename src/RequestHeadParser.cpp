@@ -268,61 +268,48 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			if (_rTarget.find(".php", _rTarget.length() - 4) != std::string::npos)
 			{
 				_isCgi = true;			
-				return ;
 			}
-
-			struct stat	st;
-			std::memset(&(st), 0, sizeof(st));
-			int			statResponse;
-			statResponse = stat(_rTarget.c_str(), &st);
-			// there's nothing here lol
-			if (statResponse == -1)
+			else
 			{
-#ifdef DEBUG_SERVER_MESSAGES
-				std::cout << "stat gave -1" << std::endl;
-#endif
-				if (_method == "GET" || _method == "DELETE")
+				struct stat	st;
+				std::memset(&(st), 0, sizeof(st));
+				int			statResponse;
+				statResponse = stat(_rTarget.c_str(), &st);
+				// there's nothing here lol
+				if (statResponse == -1)
 				{
-					throw notFound();
-				}
-			}
-			// ok, it's a directory, add an index file to it, if autoindex is off
-			if ((st.st_mode & S_IFDIR) == S_IFDIR)
-			{
-#ifdef DEBUG_SERVER_MESSAGES
-				std::cout << "it's a dir, add an index where needed: " << it->autoIndex << std::endl;
-#endif
-				if (_method == "GET")
-				{
-					if (it->autoIndex == false)
+					if (_method == "GET" || _method == "DELETE")
 					{
-#ifdef DEBUG_SERVER_MESSAGES
-						std::cout << "adding an index '" << it->index << "'" << std::endl;
-#endif
-						_rTarget += "/" + it->index;
-					}
-					else
-					{
-#ifdef DEBUG_SERVER_MESSAGES
-						std::cout << "AUTOINDEX MEEEEEEEEEEEEEE" << std::endl;
-#endif
-						// autoindex is about making a cool page that lists dirs.
-						// obviously, it should be done in the response generator.
-						_dirlist = true;
+						throw notFound();
 					}
 				}
-				else if (_method == "POST" || _method == "DELETE")
+				// ok, it's a directory, add an index file to it, if autoindex is off
+				if ((st.st_mode & S_IFDIR) == S_IFDIR)
 				{
-					// you can't just post a file over a directory which exists already
-					// nor can you delete a directory
-					throw internalServerError();
+					if (_method == "GET")
+					{
+						if (it->autoIndex == false)
+						{
+							_rTarget += "/" + it->index;
+						}
+						else
+						{
+							_dirlist = true;
+						}
+					}
+					else if (_method == "POST" || _method == "DELETE")
+					{
+						// you can't just post a file over a directory which exists already
+						// nor can you delete a directory
+						throw internalServerError();
+					}
 				}
+				pathFoundInLocs = true;
 			}
-			pathFoundInLocs = true;
 			break ;
 		}
 	}
-	if (!pathFoundInLocs)
+	if (!pathFoundInLocs && !_isCgi)
 	{
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "path not found in locs. constructing from root" << std::endl;
@@ -505,6 +492,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 		std::istringstream	cls(_head["content-length"]);
 		cls >> _contLen;
+		std::cout << "congratulations! you have found that the content length of this request is equal to........... " << _contLen << std::endl << std::endl;
 		if (cls.fail() || cls.peek() > 0)
 		{
 #ifdef DEBUG_SERVER_MESSAGES

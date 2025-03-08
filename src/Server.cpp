@@ -151,7 +151,10 @@ void	Server::_responseObjectHasAFile(int i, ResponseGenerator *responseObject)
 void	Server::_contentTooBigHandilng(int i)
 {
 	// erroneous request means file deletion.
-	remove(_perConnArr[i]->getRTarget().c_str());
+	if (!_perConnArr[i]->getIsCgi())
+	{
+		remove(_perConnArr[i]->getRTarget().c_str());
+	}
 	_cleanAfterCatching(i);
 	_debugMsgI(i, "Content size is too big, sending a 400");
 	ResponseGenerator	responseObject("400 Bad Request", _perConnArr[i]->getServerContext());
@@ -245,6 +248,7 @@ void	Server::_onHeadLocated(int i)
 {
 	try
 	{
+		std::cout << "NICE TRY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" <<std::endl;
 		RequestHeadParser		req(_localRecvBuffers[i], _perConnArr[i]->getServerContext());
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
@@ -256,6 +260,7 @@ void	Server::_onHeadLocated(int i)
 				// upon cgi: don't read and write to file. eliminate the header, collect ALL the body and THEN generate the response.
 				_perConnArr[i]->setRTarget(req.getRTarget());
 				_perConnArr[i]->setNeedsBody(true);
+				_debugMsgI(req.getContLen(), "<- cont len");
 				_perConnArr[i]->setContLen(req.getContLen());
 				if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
 				{
@@ -271,7 +276,7 @@ void	Server::_onHeadLocated(int i)
 				ResponseGenerator	responseObject(req, _perConnArr[i]->getServerContext(), _env);
 				_perConnArr[i]->setNeedsBody(true);
 				_perConnArr[i]->setContLen(req.getContLen());
-				if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize)
+				if (_perConnArr[i]->getContLen() > _perConnArr[i]->getServerContext().maxBodySize && !_perConnArr[i]->getIsCgi())
 				{
 					remove(_perConnArr[i]->getRTarget().c_str());
 					throw contentTooLarge();
@@ -510,15 +515,19 @@ void	Server::run(void)
 							{
 								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 								{
+									std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
 									_contentTooBigHandilng(i);
 								}
 								else if (_perConnArr[i]->getContLen() == _localRecvBuffers[i].size())
 								{
 									// it seems that we're done reading the body then.
 									_perConnArr[i]->setNeedsBody(false);
-
-									// XXX if cgi => make a cgi post responsegenerator object, passing it the body.
-									// XXX set appropriate flags to get ready for sending the cgi's response.
+									if (_perConnArr[i]->getIsCgi())
+									{
+										ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+										_responseObjectHasAFile(i, &rO);
+										_firstTimeSender(&rO, i, false, true);
+									}
 								}
 								// else -- nothing. just wait.
 							}
@@ -561,14 +570,19 @@ void	Server::run(void)
 						{
 							if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 							{
+								std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
 								_contentTooBigHandilng(i);
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
 								_localFWriteBuffers[i] += std::string(buf);
 								_perConnArr[i]->setNeedsBody(false);
-								// XXX if cgi => make a cgi post responsegenerator object, passing it the body.
-								// XXX set appropriate flags to get ready for sending the cgi's response.
+								if (_perConnArr[i]->getIsCgi())
+								{
+									ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+									_responseObjectHasAFile(i, &rO);
+									_firstTimeSender(&rO, i, false, true);
+								}
 							}
 							else
 							{
@@ -870,7 +884,7 @@ void	Server::run(void)
 				_perConnArr[i - _connsAmt]->setNeedsBody(false);
 				_perConnArr[i - _connsAmt]->setStillResponding(true);
 			}
-			else if (_fWCounts[i - _connsAmt] > _perConnArr[i - _connsAmt]->getContLen())
+			else if (_fWCounts[i - _connsAmt] > _perConnArr[i - _connsAmt]->getContLen() && !_perConnArr[i - _connsAmt]->getIsCgi())
 			{
 				_debugMsgI(i, "too much data. deleting the file");
 				remove(_perConnArr[i]->getRTarget().c_str());
