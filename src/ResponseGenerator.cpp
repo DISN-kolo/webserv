@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/08 15:12:33 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/08 15:58:34 by molasz-a         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -131,7 +131,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 	}
 }
 
-ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, char **env)
+ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, std::vector<std::string> env)
 {
 	_pid = -2;
 	_server = server;
@@ -384,12 +384,39 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 	return (ret);
 }
 
+char	**ResponseGenerator::_generateEnv(void)
+{
+	int	j = 0;
+
+	if (!_bodyStr.empty())
+	{
+		for (size_t i = 0; i < _bodyStr.size(); i++) {
+			if (_bodyStr[i] == '&') {
+				_env.push_back(_bodyStr.substr(j, i));
+				j = i + 1;
+			}
+			else if (i + 1 == _bodyStr.size())
+				_env.push_back(_bodyStr.substr(j, i));
+		}
+	}
+
+	char	**env = new char*[_env.size() + 1];
+
+	j = 0;
+	for (std::vector<std::string>::iterator i = _env.begin(); i != _env.end(); i++) {
+		env[j] = new char[i->size() + 1];
+		env[j++] = const_cast<char *>(i->c_str());
+	}
+	return env;
+}
+
 int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
 {
 	pid_t		pid;
 	int			fds[2];
 	std::string	cgiPath = "/bin/php-cgi", reqRTarget = req.getRTarget();
 	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
+	char		**env;
 
 	if (pipe(fds) < 0)
 		throw internalServerError();
@@ -401,7 +428,9 @@ int	ResponseGenerator::_execCgi(const RequestHeadParser &req)
 		dup2(fds[1], STDOUT_FILENO);
 		close(fds[0]);
 		close(fds[1]);
-		execve("/bin/php-cgi", argv, _env);
+		env = _generateEnv();
+		execve("/bin/php-cgi", argv, env);
+		delete []env;
 		exit(1);
 	}
 	_pid = pid;

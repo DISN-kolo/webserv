@@ -26,13 +26,19 @@ unsigned long	Server::_strIpToUL(std::string ip) const
 	return (res);
 }
 
+void	Server::_parseEnv(char **env)
+{
+	for (int i = 0; env[i]; i++)
+		_env.push_back(env[i]);
+}
+
 Server::Server(int argc, char** argv, char **env)
 {
 	_rbufSize = 4096;
 	_sbufSize = 4096;
 	_blogSize = 4096;
 	_connsAmt = CONNS_AMT;
-	_env = env;
+	_parseEnv(env);
 	if (argc == 1)
 		_grandConfig = new ServerConfig();
 	else if (argc == 2)
