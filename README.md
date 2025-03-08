@@ -4,7 +4,6 @@
 ### TODOs
 
 * CGI post
-* CGI check for while true, add a timeout response
 * graceful stop after ctrl c
 * binary data ?
 
