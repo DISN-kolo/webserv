@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/06 16:08:08 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/08 15:12:33 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -223,39 +223,34 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "it's a post of '" << req.getRTarget().c_str() << "'" << std::endl;
 #endif
-		struct stat	st;
-		int			statResponse;
-		statResponse = stat(req.getRTarget().c_str(), &st);
-		if (statResponse != -1)
+		if (req.getIsCgi())
+			_fd = _execCgi(req);
+		else
 		{
-			// FIXME update existing file instead? idk lol
-			// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's a stat != -1: file exists already. idk" << std::endl;
-#endif
-			throw internalServerError();
+			struct stat	st;
+			int			statResponse;
+			statResponse = stat(req.getRTarget().c_str(), &st);
+			if (statResponse != -1)
+			{
+				// FIXME update existing file instead? idk lol
+				// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
+				throw internalServerError();
+			}
+
+			_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
+			if (_fd == -1)
+			{
+				throw internalServerError();
+			}
+
+			std::stringstream	ss;
+			ss << "HTTP/1.1 " << "201 Created" << CRLF;
+			ss << "Date: " << _getDate() << CRLF;
+			ss << "Server: " << _getServerName() << CRLF;
+			ss << "Content-Location: " << req.getUrl() << CRLF;
+			ss << CRLF;
+			_text = ss.str();
 		}
-
-		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
-		if (_fd == -1)
-		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's an fd == -1" << std::endl;
-#endif
-			throw internalServerError();
-		}
-
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << "epic! you've just opened a file to WRITE. its REAL path is " << req.getRTarget() << ", and the fd is " << _fd << "." << std::endl;
-#endif
-
-		std::stringstream	ss;
-		ss << "HTTP/1.1 " << "201 Created" << CRLF;
-		ss << "Date: " << _getDate() << CRLF;
-		ss << "Server: " << _getServerName() << CRLF;
-		ss << "Content-Location: " << req.getUrl() << CRLF;
-		ss << CRLF;
-		_text = ss.str();
 	}
 	else if (req.getMethod() == "DELETE")
 	{
