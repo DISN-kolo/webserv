@@ -3,7 +3,6 @@
 
 ### TODOs
 
-* CGI post
 * graceful stop after ctrl c
 * binary data ?
 

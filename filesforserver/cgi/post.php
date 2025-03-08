@@ -1,4 +1,3 @@
 <?php
-	var_dump($_POST);
-	echo $a;
+	var_dump(getenv());
 ?>

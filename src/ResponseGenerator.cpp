@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/08 17:08:29 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/08 17:13:01 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -405,7 +405,7 @@ char	**ResponseGenerator::_generateEnv(void)
 				j = i + 1;
 			}
 			else if (i + 1 == _bodyStr.size())
-				_env.push_back(_bodyStr.substr(j, i));
+				_env.push_back(_bodyStr.substr(j, i + 1));
 		}
 	}
 
