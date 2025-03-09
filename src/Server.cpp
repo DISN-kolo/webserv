@@ -1,5 +1,7 @@
 #include "../inc/Server.hpp"
 
+bool	killMe = false;
+
 Server::Server()
 {
 }
@@ -32,6 +34,13 @@ void	Server::_parseEnv(char **env)
 		_env.push_back(env[i]);
 }
 
+void	_gracefulExit(int sig)
+{
+	(void)sig;
+	std::cout << "Shutting down..." << std::endl;
+	killMe = true;
+}
+
 Server::Server(int argc, char** argv, char **env)
 {
 	_rbufSize = 4096;
@@ -49,6 +58,7 @@ Server::Server(int argc, char** argv, char **env)
 	_nls.push_back(LFCRLF);
 	_nls.push_back(CRLFLF);
 	_nls.push_back(LFLF);
+	signal(SIGINT, _gracefulExit);
 }
 
 Server::Server(const Server & obj)
@@ -115,27 +125,30 @@ int	Server::_checkAvailFdI(void) const
 
 void	Server::_purgeOneConnection(int i)
 {
-	_debugMsgI(i, "thou gotst purg'd!");
-	_localRecvBuffers[i].clear();
-	_localSendStrings[i].clear();
-	_localFWriteBuffers[i].clear();
-	_fWCounts[i] = 0;
+	if (i < _connsAmt)
+	{
+		_localRecvBuffers[i].clear();
+		_localSendStrings[i].clear();
+		_localFWriteBuffers[i].clear();
+		_fWCounts[i] = 0;
+		if (_perConnArr[i] != NULL)
+		{
+			_tempFdI = i + _connsAmt;
+			if (_socks[_tempFdI].fd != -1)
+			{
+				close(_socks[_tempFdI].fd);
+				_socks[_tempFdI].fd = -1;
+				_debugMsgI(i, "file -1'd; don't forget to unlink/remove it if it's from post and you need it gone");
+			}
+
+			delete _perConnArr[i];
+			_perConnArr[i] = NULL;
+		}
+	}
 	close(_socks[i].fd);
 	_socks[i].fd = -1;
 
-	if (_perConnArr[i] != NULL)
-	{
-		_tempFdI = i + _connsAmt;
-		if (_socks[_tempFdI].fd != -1)
-		{
-			close(_socks[_tempFdI].fd);
-			_socks[_tempFdI].fd = -1;
-			_debugMsgI(i, "file -1'd; don't forget to unlink/remove it if it's from post and you need it gone");
-		}
-
-		delete _perConnArr[i];
-		_perConnArr[i] = NULL;
-	}
+	_debugMsgI(i, "thou gotst purg'd!");
 }
 
 void	Server::_responseObjectHasAFile(int i, ResponseGenerator *responseObject)
@@ -317,6 +330,10 @@ void	Server::_onHeadLocated(int i)
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
 	}
+	catch (execveError & e)
+	{
+		throw execveError();
+	}
 	catch (std::exception & e)
 	{
 		_cleanAfterCatching(i);
@@ -418,14 +435,14 @@ void	Server::_serverRunSetupInit(void)
 void	Server::run(void)
 {
     if (!_grandConfig->getConfig().size())
-		return;
+		return ;
 
 	_serverRunSetupInit();
 	char	buf[_rbufSize + 1];
 	char	fileToReadBuf[_sbufSize + 1];
 
 	_running = true;
-	while (_running)
+	while (_running || !killMe)
 	{
 		_retCode = poll(_socks, _connsAmt * 2, _timeout);
 #ifdef DEBUG_SERVER_MESSAGES
@@ -434,12 +451,21 @@ void	Server::run(void)
 
 		if (_retCode < 0)
 		{
+			if (killMe)
+			{
+				for (int i = 0; i < _connsAmt * 2; i++)
+				{
+					_purgeOneConnection(i);
+				}
+				return ;
+			}
 			throw pollError();
 		}
 		for (int i = _lstnN; i < _connsAmt; i++)
 		{
 			if (_perConnArr[i] != NULL)
 			{
+				std::cout << _perConnArr[i]->getKeepAlive() << "<- keepalive for " << i << std::endl;
 				if ((!(_perConnArr[i]->getKeepAlive()) || (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()))
 						&& !(_perConnArr[i]->getStillResponding()) && !(_perConnArr[i]->getSendingFile()) && !(_perConnArr[i]->getWritingFile()))
 				{
@@ -524,9 +550,27 @@ void	Server::run(void)
 									_perConnArr[i]->setNeedsBody(false);
 									if (_perConnArr[i]->getIsCgi())
 									{
-										ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
-										_responseObjectHasAFile(i, &rO);
-										_firstTimeSender(&rO, i, false, true);
+										try
+										{
+											ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+											_responseObjectHasAFile(i, &rO);
+											_firstTimeSender(&rO, i, false, true);
+										}
+										catch (execveError & e)
+										{
+											throw execveError();
+										}
+										catch (std::exception & e)
+										{
+											_cleanAfterCatching(i);
+											ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
+											if (responseObject.getHasFile())
+											{
+												_responseObjectHasAFile(i, &responseObject);
+											}
+
+											_firstTimeSender(&responseObject, i, true, true);
+										}
 									}
 								}
 								// else -- nothing. just wait.
@@ -898,7 +942,11 @@ void	Server::run(void)
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "                one cycle done!" << std::endl;
 #endif
-	} /* while (_running) */
+	} /* while (_running || !killMe) */
+	for (int i = 0; i < _connsAmt * 2; i++)
+	{
+		_purgeOneConnection(i);
+	}
 }
 
 Server::~Server()

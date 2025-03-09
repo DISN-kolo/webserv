@@ -33,6 +33,12 @@ class	configFileMissingException : public std::exception
 		virtual const char	*what(void) const throw();
 };
 
+class	execveError : public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	socketUnopenedError : public std::exception
 {
 	public:
@@ -108,6 +114,12 @@ class	badRequest: public std::exception
 };
 
 class	notFound: public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
+class	methodNotAllowed: public std::exception
 {
 	public:
 		virtual const char	*what(void) const throw();

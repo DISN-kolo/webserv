@@ -14,15 +14,12 @@
 # include <sys/types.h>
 # include <sys/stat.h>
 # include <sys/wait.h>
-//# include <netinet/in.h>
 # include <arpa/inet.h>
 # include <cstdlib>
 # include <cstring>
 # include <csignal>
-/*
-	std::cout << std::setw(4) << i << " > " << std::flush;
-	std::cout << msg << std::endl;
-	*/
+
+void	_gracefulExit(int sig);
 
 class Server
 {

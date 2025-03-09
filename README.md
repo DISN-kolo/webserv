@@ -3,7 +3,6 @@
 
 ### TODOs
 
-* allowed methods
 * graceful stop after ctrl c
 * binary data ?
 

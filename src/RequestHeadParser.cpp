@@ -169,49 +169,35 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	}
 	if (it == _acceptableMethods.end())
 	{
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << std::setw(7) << " > " << std::flush;
-		std::cout << "Method not found in acceptable list" << std::endl;
-#endif
 		// TODO maybe 501?
 		throw badRequest();
 	}
 
-	// forget about multiline URIs for now
-	// and actually, forever. turns out the eval sheet is very fogriving and small
 	// if ok, parse the protocol out. since it HAS to be of definite length,..
 	//               GET sp   /  sp HTTP/1.1
 	if (line.size() < 3 + 1 + 1 + 1 + 8)
 	{
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << std::setw(7) << " > " << std::flush;
-		std::cout << "This first line is way too short" << std::endl;
-#endif
 		throw badRequest();
 	}
 
-	// HTTP/1.0 support or nah? XXX
-	// solely for apache benchmark purposes xddddddd
 	if ((line.find("HTTP/1.1\r", line.size() - std::string("HTTP/1.1\r").size()) == std::string::npos)
 		&& (line.find("HTTP/1.1", line.size() - std::string("HTTP/1.1").size()) == std::string::npos))
 	{
 		if ((line.find("HTTP/1.0\r", line.size() - std::string("HTTP/1.0\r").size()) == std::string::npos)
 			&& (line.find("HTTP/1.0", line.size() - std::string("HTTP/1.0").size()) == std::string::npos))
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << std::setw(7) << " > " << std::flush;
-			std::cout << "Bad protocol" << std::endl;
-#endif
 			throw badRequest();
 		}
 		else
 		{
-			_protocol = "HTTP/1.0";
+			_protocol = "HTTP/1.0";		
+			_keepAlive = false;
 		}
 	}
 	else
 	{
 		_protocol = "HTTP/1.1";
+		_keepAlive = true;
 	}
 
 	// by that point, the request is probably correct. Still, we need to separate out the requested URI
@@ -226,16 +212,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 		else if (wcount >= 3)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << std::setw(7) << " > " << std::flush;
-			std::cout << "Too many words in Start Line" << std::endl;
-#endif
-			throw badRequest();
+			throw methodNotAllowed();
 		}
 		wcount++;
 	}
 
-	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
+	// XXX just for cleaning up the paths and all, maybe generalize this method to ANY string
 	_pathDeobfuscator();
 	// _rTarget changed. connect it to the url string for the content-location stuff. also, save it as "apparent target" for dirlisting.
 	_apparentTarget = _rTarget;
@@ -247,9 +229,18 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		// if the name of the location is at the very front of the target,...
 		if (_rTarget.find(it->name) == 0)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "the starting point of the path is found to be " << it->name << std::endl;
-#endif
+			size_t y;
+			for (y = 0; y < it->accMethods.size(); y++)
+			{
+				if (it->accMethods[y] == _method)
+				{
+					break ;
+				}
+			}
+			if (y == it->accMethods.size())
+			{
+				throw methodNotAllowed();
+			}
 			/// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
 			if (!(it->redir.empty()))
 			{
