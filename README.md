@@ -3,8 +3,7 @@
 
 ### TODOs
 
-* graceful stop after ctrl c
-* binary data ?
+* evaluate
 
 ### current bugs
 

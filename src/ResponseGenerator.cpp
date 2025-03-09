@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/09 13:51:46 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/09 16:57:11 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -440,8 +440,7 @@ int	ResponseGenerator::_execCgi(std::string rTarget)
 		close(fds[0]);
 		close(fds[1]);
 		env = _generateEnv();
-		//execve("/bin/php-cgi", argv, env);
-		execve("bean/php-cgi", argv, env);
+		execve("/bin/php-cgi", argv, env);
 		delete []env;
 		throw execveError();
 	}
