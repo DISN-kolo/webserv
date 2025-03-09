@@ -3,6 +3,7 @@
 
 ### TODOs
 
+* cleanup TODOs, XXXs, FIXMEs...
 * evaluate
 
 ### current bugs
