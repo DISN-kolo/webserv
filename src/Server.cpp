@@ -774,13 +774,14 @@ void	Server::run(void)
 								// the remnants
 								_perConnArr[i]->setTimeStarted(time(NULL));
 
-								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 								{
+									send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
 									_localSendStrings[i].clear();
 								}
 								else
 								{
+									send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 									_localSendStrings[i].erase(0, _sbufSize);
 								}
 							}
@@ -818,13 +819,14 @@ void	Server::run(void)
 
 							fileToReadBuf[_retCode] = 0;
 							_localSendStrings[i] += fileToReadBuf;
-							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
 								_localSendStrings[i].clear();
 							}
 							else
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
 						}
@@ -837,13 +839,14 @@ void	Server::run(void)
 							// the remnants
 							_perConnArr[i]->setTimeStarted(time(NULL));
 
-							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
 								_localSendStrings[i].clear();
 							}
 							else
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
 						}
