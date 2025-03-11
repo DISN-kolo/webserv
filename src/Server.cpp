@@ -266,6 +266,8 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool 
 
 void	Server::_onHeadLocated(int i)
 {
+	std::cout << "head located: " << std::endl;
+	std::cout << _localRecvBuffers[i] << std::endl;
 	try
 	{
 		RequestHeadParser		req(_localRecvBuffers[i], _perConnArr[i]->getServerContext());
@@ -342,6 +344,7 @@ void	Server::_onHeadLocated(int i)
 	}
 	catch (std::exception & e)
 	{
+		// TODO parse keepalive from http in this
 		_cleanAfterCatching(i);
 		ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
 		if (responseObject.getHasFile())
@@ -569,6 +572,7 @@ void	Server::run(void)
 										}
 										catch (std::exception & e)
 										{
+											// TODO parse keepalive from http in this
 											_cleanAfterCatching(i);
 											ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
 											if (responseObject.getHasFile())
@@ -679,6 +683,7 @@ void	Server::run(void)
 						if (_perConnArr[i]->getHasFile())
 						{
 							_debugMsgI(i, "switching to filesending mode");
+							std::cout << "i should send this: " << _socks[i + _connsAmt].fd << std::endl;
 							_perConnArr[i]->setSendingFile(true);
 						}
 						else
@@ -710,12 +715,14 @@ void	Server::run(void)
 						}
 						else if (_retCode == 0)
 						{
+							_debugMsgI(i, "retcode on file is 0");
 							// we somehow had something from poll but showed up with 0 bytes upon actual reading.
 							_perConnArr[i]->setTimeStarted(time(NULL));
 							_cleanAfterNormalRead(i);
 						}
 						else if (_perConnArr[i]->getRemainingFileSize() == _retCode)
 						{
+							_debugMsgI(i, "perfect retcode on file!");
 							// the amount of file left is exactly the amount that was read. ggs
 							_perConnArr[i]->setTimeStarted(time(NULL));
 							fileToReadBuf[_retCode] = 0;
@@ -885,12 +892,12 @@ void	Server::run(void)
 			} /* else if POLLOUT */
 			if (i >= _lstnN && _perConnArr[i] != NULL)
 			{
-//				std::cout << i << std::endl;
-//				std::cout << "ka " << _perConnArr[i]->getKeepAlive() << std::endl;
-//				std::cout << "to " << (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()) << std::endl;
-//				std::cout << "sr " << _perConnArr[i]->getStillResponding() << std::endl;
-//				std::cout << "sf " << _perConnArr[i]->getSendingFile() << std::endl;
-//				std::cout << "wf " << _perConnArr[i]->getWritingFile() << std::endl;
+				std::cout << i << std::endl;
+				std::cout << "ka " << _perConnArr[i]->getKeepAlive() << std::endl;
+				std::cout << "to " << (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()) << std::endl;
+				std::cout << "sr " << _perConnArr[i]->getStillResponding() << std::endl;
+				std::cout << "sf " << _perConnArr[i]->getSendingFile() << std::endl;
+				std::cout << "wf " << _perConnArr[i]->getWritingFile() << std::endl;
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
 				{

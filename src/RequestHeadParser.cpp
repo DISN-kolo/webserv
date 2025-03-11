@@ -198,6 +198,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		_protocol = "HTTP/1.1";
 		_keepAlive = true;
 	}
+	std::cout << "we've managed a keepalive of " << _keepAlive << std::endl;
 
 	// by that point, the request is probably correct. Still, we need to separate out the requested URI
 	std::string			word;

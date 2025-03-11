@@ -8,8 +8,7 @@
 
 ### current bugs
 
-* weird dangling stuff in i.php for example, at the end of the "view source" after the \</html\> already happened
-* CGI buffering size and send's crash in strange cases that we can't reproduce on 42's macs
+* no check of keepalive in case of throw. if we do apache benchmark tests with http 1.0, it'd be cool to respect non-keep-aliving even if we get a throw (404, for example)
 
 ### CONFIGURATION FILE
 
