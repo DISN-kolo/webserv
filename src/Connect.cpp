@@ -146,7 +146,6 @@ void	Connect::setContLen(size_t v)
 
 void	Connect::setKeepAlive(bool v)
 {
-	std::cout << "setting the keepalive to " << v << " from Connect" << std::endl;
 	_keepAlive = v;
 }
 

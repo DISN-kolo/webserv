@@ -43,8 +43,8 @@ void	_gracefulExit(int sig)
 
 Server::Server(int argc, char** argv, char **env)
 {
-	_rbufSize = 276;
-	_sbufSize = 10;
+	_rbufSize = 4096;
+	_sbufSize = 4096;
 	_blogSize = 4096;
 	_connsAmt = CONNS_AMT;
 	_parseEnv(env);
@@ -447,7 +447,7 @@ void	Server::run(void)
 
 	_serverRunSetupInit();
 	char	buf[_rbufSize + 1];
-	char	fileToReadBuf[_sbufSize + 1];
+	char	fileToReadBuf[_rbufSize + 1];
 
 	_running = true;
 	while (_running || !killMe)
@@ -665,8 +665,6 @@ void	Server::run(void)
 						_perConnArr[i]->setTimeStarted(time(NULL));
 						_localSendStrings[i] = _perConnArr[i]->getSendStr().substr(0, _sbufSize);
 						send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
-						std::cout << "socks pollout v1, not sending file, just sent this:" << std::endl;
-						std::cout << _localSendStrings[i] << std::endl;
 
 						_perConnArr[i]->eraseSendStr(0, _sbufSize);
 					}
@@ -674,9 +672,8 @@ void	Server::run(void)
 					{
 						_perConnArr[i]->setTimeStarted(time(NULL));
 						send(_socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
-						std::cout << "socks pollout v2, not sending file, just sent this:" << std::endl;
-						std::cout << _perConnArr[i]->getSendStr() << std::endl;
 						_perConnArr[i]->setStillResponding(false);
+
 						_perConnArr[i]->eraseSendStr(0, _perConnArr[i]->getSendStr().size());
 						// maybe, cgi send needs to have its own flag XXX
 						if (_perConnArr[i]->getHasFile())
@@ -704,7 +701,7 @@ void	Server::run(void)
 					else if ((_socks[_tempFdI].revents & POLLIN) == POLLIN)
 					{
 						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
-						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
+						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _rbufSize);
 						if (_retCode < 0)
 						{
 							_debugMsgI(i, "retcode on file is < 0");
@@ -724,8 +721,6 @@ void	Server::run(void)
 							fileToReadBuf[_retCode] = 0;
 							_localSendStrings[i] = std::string(fileToReadBuf);
 							send(_socks[i].fd, _localSendStrings[i].c_str(), _retCode + 1, 0);
-							std::cout << "sending a file v1, just sent this:" << std::endl;
-							std::cout << _localSendStrings[i] << std::endl;
 							_cleanAfterNormalRead(i);
 						}
 						else
@@ -736,8 +731,6 @@ void	Server::run(void)
 							fileToReadBuf[_retCode] = 0;
 							_localSendStrings[i] = std::string(fileToReadBuf);
 							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
-							std::cout << "sending a file v2, just sent this:" << std::endl;
-							std::cout << _localSendStrings[i] << std::endl;
 
 							_perConnArr[i]->diminishRemainingFileSize(_sbufSize);
 						}
@@ -765,9 +758,7 @@ void	Server::run(void)
 					{
 						_debugMsgI(i, "pollin on tempfd sock");
 						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
-						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
-						std::cout << "I have currently read:" << std::endl;
-						std::cout << fileToReadBuf << std::endl;
+						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _rbufSize);
 						if (_retCode < 0)
 						{
 							_debugMsgI(i, "retcode on file is < 0");
@@ -784,8 +775,6 @@ void	Server::run(void)
 								_perConnArr[i]->setTimeStarted(time(NULL));
 
 								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
-								_debugMsgI(i, "local send string before...");
-								std::cout << _localSendStrings[i] << std::endl;
 								if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 								{
 									_localSendStrings[i].clear();
@@ -794,8 +783,6 @@ void	Server::run(void)
 								{
 									_localSendStrings[i].erase(0, _sbufSize);
 								}
-								_debugMsgI(i, "local send string after!!!");
-								std::cout << _localSendStrings[i] << std::endl;
 							}
 							else
 							{
@@ -812,8 +799,6 @@ void	Server::run(void)
 							_perConnArr[i]->setTimeStarted(time(NULL));
 							_localSendStrings[i] = std::string("HTTP/1.1 ") + _parseCgiStatus(fileToReadBuf) + CRLF;
 							_localSendStrings[i] += fileToReadBuf;
-							_debugMsgI(i, "local send string before...");
-							std::cout << _localSendStrings[i] << std::endl;
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
 								send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
@@ -824,8 +809,6 @@ void	Server::run(void)
 								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
-							_debugMsgI(i, "local send string after!!!");
-							std::cout << _localSendStrings[i] << std::endl;
 						}
 						else
 						{
@@ -835,8 +818,6 @@ void	Server::run(void)
 
 							fileToReadBuf[_retCode] = 0;
 							_localSendStrings[i] += fileToReadBuf;
-							_debugMsgI(i, "local send string before...");
-							std::cout << _localSendStrings[i] << std::endl;
 							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
@@ -846,8 +827,6 @@ void	Server::run(void)
 							{
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
-							_debugMsgI(i, "local send string after!!!");
-							std::cout << _localSendStrings[i] << std::endl;
 						}
 					}
 					else
@@ -859,8 +838,6 @@ void	Server::run(void)
 							_perConnArr[i]->setTimeStarted(time(NULL));
 
 							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
-							_debugMsgI(i, "local send string before...");
-							std::cout << _localSendStrings[i] << std::endl;
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
 								_localSendStrings[i].clear();
@@ -869,12 +846,9 @@ void	Server::run(void)
 							{
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
-							_debugMsgI(i, "local send string after!!!");
-							std::cout << _localSendStrings[i] << std::endl;
 						}
 						else
 						{
-							_debugMsgI(i, "cgi not ready yet or already done");
 //							std::cout << time(NULL) << std::endl;
 //							std::cout << _perConnArr[i]->getCgiTimeStarted() << std::endl;
 //							std::cout << _perConnArr[i]->getCgiTimeout() << std::endl;

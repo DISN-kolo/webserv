@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/11 12:34:08 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/11 14:43:29 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -429,6 +429,7 @@ int	ResponseGenerator::_execCgi(std::string rTarget)
 	int			fds[2];
 	std::string	cgiPath = "/bin/php-cgi", reqRTarget = rTarget;
 	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
+//	char		*argv[5] = {(char *)cgiPath.c_str(), (char *)"-d", (char *)"realpath_cache_size=128", (char *)reqRTarget.c_str(), NULL};
 	char		**env;
 
 	if (pipe(fds) < 0)

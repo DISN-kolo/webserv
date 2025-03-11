@@ -449,24 +449,20 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	// default k-a values
 	if (_protocol == "HTTP/1.0")
 	{
-		std::cout << "protocol is 10, setting ka to false..." << std::endl;
 		_keepAlive = false;
 		// and now to actually check the header...
 		if (helper.find("keep-alive") != std::string::npos)
 		{
-			std::cout << "nevermind! keepalive in head found, setting to true" << std::endl;
 			_keepAlive = true;
 		}
 	}
 	else
 	{
-		std::cout << "protocol is 11, setting ka to true" << std::endl;
 		_keepAlive = true;
 		if (helper.find("keep-alive") == std::string::npos)
 		{
 			if (helper.find("close") != std::string::npos)
 			{
-				std::cout << "apparently, we have a 'close' tag. setting ka to false" << std::endl;
 				_keepAlive = false;
 			}
 		}
