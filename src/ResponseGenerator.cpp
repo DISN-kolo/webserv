@@ -6,7 +6,7 @@
 /*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/09 16:57:11 by akozin           ###   ########.fr       */
+/*   Updated: 2025/03/11 12:34:08 by akozin           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,7 @@ ResponseGenerator::ResponseGenerator(int code)
 // for that, we need context
 ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t server)
 {
+	_hasFile = false;
 	_pid = -2;
 	std::string	errFilePath = "";
 	std::string	errDirPath = "";
@@ -133,6 +134,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, std::vector<std::string> env)
 {
+	_hasFile = false;
 	_bodyStr = "";
 	_pid = -2;
 	_server = server;
