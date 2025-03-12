@@ -90,6 +90,11 @@ const char *badRequest::what(void) const throw()
 	return ("400 Bad Request");
 }
 
+const char *forbidden::what(void) const throw()
+{
+	return ("403 Forbidden");
+}
+
 const char *notFound::what(void) const throw()
 {
 	return ("404 Not Found");

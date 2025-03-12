@@ -343,6 +343,11 @@ void	Server::_onHeadLocated(int i)
 	}
 	catch (execveError & e)
 	{
+		for (int i = 0; i < _connsAmt * 2; i++)
+		{
+			_purgeOneConnection(i);
+		}
+		std::cout << "execve error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 1" << std::endl;
 		throw execveError();
 	}
 	catch (std::exception & e)
@@ -571,6 +576,11 @@ void	Server::run(void)
 										}
 										catch (execveError & e)
 										{
+											for (int i = 0; i < _connsAmt * 2; i++)
+											{
+												_purgeOneConnection(i);
+											}
+											std::cout << "execve error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2" << std::endl;
 											throw execveError();
 										}
 										catch (std::exception & e)
