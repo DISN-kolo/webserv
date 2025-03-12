@@ -16,7 +16,7 @@ CC = c++
 
 #CFLAGS = -std=c++98 -O3
 #CFLAGS = -Wall -Wextra -Werror -std=c++98 -O3
-CFLAGS = -Wall -Wextra -Werror -std=c++98 -g -fsanitize=address -DDEBUG_SERVER_MESSAGES
+CFLAGS = -Wall -Wextra -Werror -std=c++98# -fsanitize=address# -g -DDEBUG_SERVER_MESSAGES
 
 RM = rm -rf
 

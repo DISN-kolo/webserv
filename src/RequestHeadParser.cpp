@@ -198,7 +198,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		_protocol = "HTTP/1.1";
 		_keepAlive = true;
 	}
-	std::cout << "we've managed a keepalive of " << _keepAlive << std::endl;
+//	std::cout << "we've managed a keepalive of " << _keepAlive << std::endl;
 
 	// by that point, the request is probably correct. Still, we need to separate out the requested URI
 	std::string			word;
@@ -248,7 +248,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 				std::ostringstream	redirss;
 				redirss << "http://" << server.host << ":" << server.ports[0] << "/" << it->redir;
 				_redirLoc = redirss.str();
-				std::cout << "returning with keepalive equal to " << _keepAlive << std::cout;
+//				std::cout << "returning with keepalive equal to " << _keepAlive << std::cout;
 				return ;
 			}
 			// ...replace it with the root of the location.
