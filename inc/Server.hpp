@@ -35,7 +35,7 @@ private:
 	std::string	_parseCgiStatus(char * fbuf);
 	void		_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool purgeC);
 	void		_onHeadLocated(int i);
-	void		_cgiPostReadingIsDone(int i);
+	void		_postReadingIsDone(int i);
 	void		_eraseDoubleNlInLocalRecvBuffer(int i);
 	void		_purgeOneConnection(int i);
 	void		_responseObjectHasAFile(int i, ResponseGenerator *responseObject);

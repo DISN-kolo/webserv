@@ -231,7 +231,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			{
 				throw methodNotAllowed();
 			}
-			/// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
+			// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
 			if (!(it->redir.empty()))
 			{
 				_redirection = true;
@@ -243,7 +243,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			}
 			// ...replace it with the root of the location.
 			_rTarget.erase(0, it->name.size());
-			// XXX for now, relativize the root in the location. might be changed soon XXX
 			_rTarget = server.root + "/" + it->root + "/" + _rTarget;
 			// first, check if the result is a directory or not.
 			
@@ -293,6 +292,11 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	}
 	if (!pathFoundInLocs && !_isCgi)
 	{
+		// remember! root is always get-only
+		if (_method != "GET")
+		{
+			throw methodNotAllowed();
+		}
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "path not found in locs. constructing from root" << std::endl;
 		std::cout << _rTarget << std::endl;
@@ -303,26 +307,15 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		std::memset(&(st), 0, sizeof(st));
 		int			statResponse;
 		statResponse = stat(_rTarget.c_str(), &st);
-		// there's nothing here lol
 		if (statResponse == -1)
 		{
-			if (_method == "GET" || _method == "DELETE")
-			{
-				throw notFound();
-			}
+			throw notFound();
 		}
 		// ok, it's a directory, add an index file to it, if autoindex is off
 		// wait, but root autoindex is always off, iirc.
 		if ((st.st_mode & S_IFDIR) == S_IFDIR)
 		{
-			if (_method == "GET")
-			{
-				_rTarget += "/" + server.index;
-			}
-			else
-			{
-				throw forbidden();
-			}
+			_rTarget += "/" + server.index;
 		}
 	}
 

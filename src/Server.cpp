@@ -291,10 +291,10 @@ void	Server::_onHeadLocated(int i)
 					throw contentTooLarge();
 				}
 				_eraseDoubleNlInLocalRecvBuffer(i);
-				if (_localRecvBuffers[i].size() == static_cast<size_t>(_perConnArr[i]->getContLen()))
+				if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 				{
 					_debugMsgI(i, "cgi post hit inside of head located");
-					_cgiPostReadingIsDone(i);
+					_postReadingIsDone(i);
 				}
 				// local fw buffers now only serves the body collection function. we will not use it to write anything.
 			}
@@ -376,7 +376,7 @@ void	Server::_onHeadLocated(int i)
 	}
 }
 
-void	Server::_cgiPostReadingIsDone(int i)
+void	Server::_postReadingIsDone(int i)
 {
 	_perConnArr[i]->setNeedsBody(false);
 	if (_perConnArr[i]->getIsCgi())
@@ -618,8 +618,11 @@ void	Server::run(void)
 								else if (_perConnArr[i]->getContLen() == _localRecvBuffers[i].size())
 								{
 									// it seems that we're done reading the body then.
-									_debugMsgI(i, "cgi post hit on a retcode 0");
-									_cgiPostReadingIsDone(i);
+									if (_perConnArr[i]->getIsCgi())
+									{
+										_debugMsgI(i, "cgi post hit on a retcode 0");
+									}
+									_postReadingIsDone(i);
 								}
 								// else -- nothing. just wait.
 							}
@@ -663,13 +666,16 @@ void	Server::run(void)
 							if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 							{
 //								std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
-								_debugMsgI(i, "cgi post hit on a normal retcode");
 								_contentTooBigHandilng(i);
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
+								if (_perConnArr[i]->getIsCgi())
+								{
+									_debugMsgI(i, "cgi post hit on a normal retcode");
+								}
 								_localFWriteBuffers[i] += std::string(buf);
-								_cgiPostReadingIsDone(i);
+								_postReadingIsDone(i);
 							}
 							else
 							{
