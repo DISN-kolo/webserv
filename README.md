@@ -3,14 +3,10 @@
 
 ### TODOs
 
-* cleanup path deobfuscation. for example, POST /cgi/../../../ does weird things. maybe it's 500 cuz posting a dir? shan't it be forbidden?
 * cleanup TODOs, XXXs, FIXMEs...
 * evaluate
 
 ### current bugs
-
-* can't receive an execve exception. nothing is printed on the execve branch.
-* pipe fail leads to getting stuck like with minishell. must create its own fail. but first handle exec fail, since it doesn't seem to work.
 
 ### CONFIGURATION FILE
 
