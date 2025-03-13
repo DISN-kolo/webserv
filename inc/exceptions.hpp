@@ -33,6 +33,12 @@ class	configFileMissingException : public std::exception
 		virtual const char	*what(void) const throw();
 };
 
+class	pipeError : public std::exception
+{
+	public:
+		virtual const char	*what(void) const throw();
+};
+
 class	execveError : public std::exception
 {
 	public:

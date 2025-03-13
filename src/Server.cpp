@@ -341,13 +341,20 @@ void	Server::_onHeadLocated(int i)
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
 	}
+	catch (pipeError & e)
+	{
+		for (int i = 0; i < _connsAmt * 2; i++)
+		{
+			_purgeOneConnection(i);
+		}
+		throw pipeError();
+	}
 	catch (execveError & e)
 	{
 		for (int i = 0; i < _connsAmt * 2; i++)
 		{
 			_purgeOneConnection(i);
 		}
-		std::cout << "execve error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 1" << std::endl;
 		throw execveError();
 	}
 	catch (std::exception & e)
@@ -574,13 +581,20 @@ void	Server::run(void)
 											_responseObjectHasAFile(i, &rO);
 											_firstTimeSender(&rO, i, false, true);
 										}
+										catch (pipeError & e)
+										{
+											for (int i = 0; i < _connsAmt * 2; i++)
+											{
+												_purgeOneConnection(i);
+											}
+											throw pipeError();
+										}
 										catch (execveError & e)
 										{
 											for (int i = 0; i < _connsAmt * 2; i++)
 											{
 												_purgeOneConnection(i);
 											}
-											std::cout << "execve error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2" << std::endl;
 											throw execveError();
 										}
 										catch (std::exception & e)
@@ -880,7 +894,23 @@ void	Server::run(void)
 							if (waitpid(_perConnArr[i]->getPid(), NULL, WNOHANG) == -1)
 							{
 								_debugMsgI(i, "child cgi died itself");
-								_purgeOneConnection(i);
+								if (_perConnArr[i]->getFirstTimeCgiSend())
+								{
+									// we didn't send anything, execve probably failed.
+									_cleanAfterCatching(i);
+									_perConnArr[i]->setIsCgi(false);
+									ResponseGenerator	responseObject("500 Internal Server Error", _perConnArr[i]->getServerContext());
+									if (responseObject.getHasFile())
+									{
+										_responseObjectHasAFile(i, &responseObject);
+									}
+
+									_firstTimeSender(&responseObject, i, true, true);
+								}
+								else
+								{
+									_purgeOneConnection(i);
+								}
 							}
 							else if (time(NULL) - _perConnArr[i]->getCgiTimeStarted() > _perConnArr[i]->getCgiTimeout())
 							{

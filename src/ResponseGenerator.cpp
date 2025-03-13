@@ -165,9 +165,9 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 			_fd = open(req.getRTarget().c_str(), O_RDONLY);
 			if (_fd == -1)
 			{
-				//throw std::runtime_error("001 point");
+//				throw std::runtime_error("001 point");
 				throw internalServerError();
-				std::cout << "fail 1" << std::endl;
+//				std::cout << "fail 1" << std::endl;
 			}
 			_fSize = st.st_size;
 			_hasFile = true;
@@ -202,9 +202,9 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
 		if (_fd == -1)
 		{
-			//throw std::runtime_error("002 point");
+//			throw std::runtime_error("002 point");
 			throw internalServerError();
-			std::cout << "fail 2" << std::endl;
+//			std::cout << "fail 2" << std::endl;
 		}
 
 		std::stringstream	ss;
@@ -233,9 +233,9 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		}
 		if (remove(req.getRTarget().c_str()) != 0)
 		{
-			//throw std::runtime_error("003 point");
+//			throw std::runtime_error("003 point");
 			throw internalServerError();
-			std::cout << "fail 3" << std::endl;
+//			std::cout << "fail 3" << std::endl;
 		}
 		else
 		{
@@ -308,9 +308,9 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "opendir failed on autoindexing of " << apparentTarget << ", which is " << dirpath << " in real life" << std::endl;
 #endif
-		//throw std::runtime_error("004 point");
+//		throw std::runtime_error("004 point");
 		throw internalServerError();
-		std::cout << "fail 4" << std::endl;
+//		std::cout << "fail 4" << std::endl;
 	}
 
 	struct stat	st;
@@ -381,24 +381,24 @@ int	ResponseGenerator::_execCgi(std::string rTarget)
 {
 	pid_t		pid;
 	int			fds[2];
-	//std::string	cgiPath = "/bin/php-cgi", reqRTarget = rTarget;
-	std::string	cgiPath = "/bxin/php-cgi", reqRTarget = rTarget;
+	std::string	cgiPath = "/bin/php-cgi", reqRTarget = rTarget;
+//	std::string	cgiPath = "/bxin/php-cgi", reqRTarget = rTarget;
 	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
 //	char		*argv[5] = {(char *)cgiPath.c_str(), (char *)"-d", (char *)"realpath_cache_size=128", (char *)reqRTarget.c_str(), NULL};
 	char		**env;
 
 	if (pipe(fds) < 0)
 	{
-		//throw std::runtime_error("005 point");
-		throw internalServerError();
-		std::cout << "fail 5" << std::endl;
+//		throw std::runtime_error("005 point");
+		throw pipeError();
+//		std::cout << "fail 5" << std::endl;
 	}
 	pid = fork();
 	if (pid < 0)
 	{
-		//throw std::runtime_error("006 point");
+//		throw std::runtime_error("006 point");
 		throw internalServerError();
-		std::cout << "fail 6" << std::endl;
+//		std::cout << "fail 6" << std::endl;
 	}
 	if (!pid)
 	{
@@ -406,13 +406,13 @@ int	ResponseGenerator::_execCgi(std::string rTarget)
 		close(fds[0]);
 		close(fds[1]);
 		env = _generateEnv();
-		//execve("/bin/php-cgi", argv, env);
-		std::cout << "hello!" << std::endl;
-		execve("/bxin/php-cgi", argv, env);
-		std::cout << "bye!" << std::endl;
+		execve("/bin/php-cgi", argv, env);
+//		execve("/bxin/php-cgi", argv, env);
+		std::cerr << "execve says bye! this is an error, fyi\n" << std::endl;
 		delete []env;
 		throw execveError();
 	}
+	close (fds[1]);
 	_pid = pid;
 	return (fds[0]);
 }

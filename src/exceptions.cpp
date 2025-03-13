@@ -25,6 +25,11 @@ const char *configFileMissingException::what(void) const throw()
 	return ("Config file error: missing configuration");
 }
 
+const char *pipeError::what(void) const throw()
+{
+	return ("pipe failed");
+}
+
 const char *execveError::what(void) const throw()
 {
 	return ("execve failed");
