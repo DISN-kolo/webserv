@@ -1,42 +1,14 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   ResponseGenerator.cpp                              :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: akozin <akozin@student.42barcelona.com>    +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/03/04 15:59:48 by akozin            #+#    #+#             */
-/*   Updated: 2025/03/08 17:13:01 by akozin           ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
 #include "../inc/ResponseGenerator.hpp"
 
 ResponseGenerator::ResponseGenerator()
 {
 }
 
-// more or less a placeholder.
-ResponseGenerator::ResponseGenerator(int code)
-{
-	std::stringstream	ss;
-	std::string	cont = _getContent(code);
-	ss << "HTTP/1.1 " << code << " " << _getStatusMessage(code) << CRLF;
-	ss << "Date: " << _getDate() << CRLF;
-	ss << "Server: " << _getServerName() << CRLF;
-	ss << "Content-Type: " << _getContentType() << CRLF;
-	ss << "Content-Length: " << cont.size() << CRLF;
-	ss << CRLF;
-	ss << cont;
-	// no vvvv ? FIXME remove it?
-	ss << CRLF;
-	_text = ss.str();
-}
-
 // this is for errors only. thus we need to check if any of the errors are actually like pre-made pages.
 // for that, we need context
 ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t server)
 {
+	_hasFile = false;
 	_pid = -2;
 	std::string	errFilePath = "";
 	std::string	errDirPath = "";
@@ -133,6 +105,7 @@ ResponseGenerator::ResponseGenerator(const char * ewhat, struct config_server_t 
 
 ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct config_server_t server, std::vector<std::string> env)
 {
+	_hasFile = false;
 	_bodyStr = "";
 	_pid = -2;
 	_server = server;
@@ -183,22 +156,19 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 			statResponse = stat(req.getRTarget().c_str(), &st);
 			if (statResponse == -1)
 			{
-#ifdef DEBUG_SERVER_MESSAGES
-				std::cout << "it's a stat == -1" << std::endl;
-#endif
 				throw notFound();
 			}
 			if ((st.st_mode & S_IFREG) != S_IFREG)
 			{
-#ifdef DEBUG_SERVER_MESSAGES
-				std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
-#endif
-#ifdef DEBUG_SERVER_MESSAGES
-				std::cout << st.st_mode << std::endl;
-#endif
-				throw internalServerError();
+				throw forbidden();
 			}
 			_fd = open(req.getRTarget().c_str(), O_RDONLY);
+			if (_fd == -1)
+			{
+//				throw std::runtime_error("001 point");
+				throw internalServerError();
+//				std::cout << "fail 1" << std::endl;
+			}
 			_fSize = st.st_size;
 			_hasFile = true;
 #ifdef DEBUG_SERVER_MESSAGES
@@ -213,13 +183,6 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 			ss << "Content-Length: " << _fSize << CRLF;
 			ss << CRLF;
 			_text = ss.str();
-			if (_fd == -1)
-			{
-#ifdef DEBUG_SERVER_MESSAGES
-				std::cout << "it's an fd == -1" << std::endl;
-#endif
-				throw internalServerError();
-			}
 		}
 	}
 	else if (req.getMethod() == "POST")
@@ -230,17 +193,18 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		struct stat	st;
 		int			statResponse;
 		statResponse = stat(req.getRTarget().c_str(), &st);
+		std::cout << statResponse << std::endl;
 		if (statResponse != -1)
 		{
-			// FIXME update existing file instead? idk lol
-			// TODO add appropriate response codes insteada of just 502!!! this is a MUST have feature before release since it's the correctness of post handling
-			throw internalServerError();
+			throw forbidden();
 		}
 
 		_fd = open(req.getRTarget().c_str(), O_CREAT | O_WRONLY, 0644);
 		if (_fd == -1)
 		{
+//			throw std::runtime_error("002 point");
 			throw internalServerError();
+//			std::cout << "fail 2" << std::endl;
 		}
 
 		std::stringstream	ss;
@@ -261,25 +225,17 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 		statResponse = stat(req.getRTarget().c_str(), &st);
 		if (statResponse == -1)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's a stat == -1" << std::endl;
-#endif
 			throw notFound();
 		}
 		if ((st.st_mode & S_IFREG) != S_IFREG)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "it's an st_mode & S_IFREG != S_IFREG" << std::endl;
-			std::cout << st.st_mode << std::endl;
-#endif
-			throw internalServerError();
+			throw forbidden();
 		}
 		if (remove(req.getRTarget().c_str()) != 0)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "remove failed" << std::endl;
-#endif
+//			throw std::runtime_error("003 point");
 			throw internalServerError();
+//			std::cout << "fail 3" << std::endl;
 		}
 		else
 		{
@@ -300,10 +256,12 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 
 ResponseGenerator::ResponseGenerator(std::string body, std::string rTarget, std::vector<std::string> env)
 {
+	// POST
+	std::cout << "entering post cgi!" << std::endl;
 	_env = env;
 	_bodyStr = body;
-	_fd = _execCgi(rTarget);
 	_hasFile = true;
+	_fd = _execCgi(rTarget);
 }
 
 ResponseGenerator::ResponseGenerator(const ResponseGenerator & obj)
@@ -324,7 +282,7 @@ ResponseGenerator::~ResponseGenerator()
 void	ResponseGenerator::_defaultErrorPageGenerator(const char * ewhat)
 {
 	std::stringstream	ss;
-	std::string	cont = "<body><p align=\"center\">" + std::string(ewhat) + "</p></body>";
+	std::string	cont = "<!DOCTYPE html>\n<body><p align=\"center\">" + std::string(ewhat) + "</p></body>";
 	ss << "HTTP/1.1 " << ewhat << CRLF;
 	ss << "Date: " << _getDate() << CRLF;
 	ss << "Server: " << _getServerName() << CRLF;
@@ -339,7 +297,7 @@ void	ResponseGenerator::_defaultErrorPageGenerator(const char * ewhat)
 std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string apparentTarget, struct config_server_t server)
 {
 	std::string	ret;
-	ret = "<body>\n<h1>\n";
+	ret = "<!DOCTYPE html>\n<body>\n<h1>\n";
 	ret += "Listing of " + apparentTarget + ":\n";
 	ret += "</h1>\n<hr />\n<table>\n";
 	ret += "<thead>\n<tr>\n<th scope=\"col\">Type</th>\n<th scope=\"col\">Name</th>\n</tr>\n</thead>";
@@ -352,7 +310,9 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "opendir failed on autoindexing of " << apparentTarget << ", which is " << dirpath << " in real life" << std::endl;
 #endif
+//		throw std::runtime_error("004 point");
 		throw internalServerError();
+//		std::cout << "fail 4" << std::endl;
 	}
 
 	struct stat	st;
@@ -364,9 +324,6 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 		statResponse = stat((dirpath + "/" + dEnt->d_name).c_str(), &st);
 		if (statResponse == -1)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "stat failed on " << dirpath << " " << dEnt->d_name << std::endl;
-#endif
 			dEnt = readdir(dirVar);
 			continue ;
 		}
@@ -387,25 +344,35 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 		ret += "<tr>\n<td>" + fmode + "</td>\n<td><a href=\"" + returlss.str() + std::string(dEnt->d_name) + "\">" + std::string(dEnt->d_name) + "</a></td>\n</tr>\n";
 		dEnt = readdir(dirVar);
 	}
-	ret += "</tbody>\n</table>\n</body>\n";
+	ret += "</tbody>\n</table>\n</body>";
+	closedir(dirVar);
 	return (ret);
 }
 
 char	**ResponseGenerator::_generateEnv(void)
 {
 	int	j = 0;
+	std::stringstream	ss(_bodyStr);
+	std::string			currentPart = "";
+	size_t				eqPos = 0;
 
 	if (!_bodyStr.empty())
 	{
-		for (size_t i = 0; i < _bodyStr.size(); i++)
+		while (std::getline(ss, currentPart, '&'))
 		{
-			if (_bodyStr[i] == '&')
+			if (currentPart.empty())
 			{
-				_env.push_back(_bodyStr.substr(j, i));
-				j = i + 1;
+				continue ;
 			}
-			else if (i + 1 == _bodyStr.size())
-				_env.push_back(_bodyStr.substr(j, i + 1));
+			eqPos = currentPart.find('=');
+			if (eqPos != std::string::npos)
+			{
+				_env.push_back(currentPart);
+			}
+			else
+			{
+				_env.push_back(currentPart + "=");
+			}
 		}
 	}
 
@@ -426,14 +393,24 @@ int	ResponseGenerator::_execCgi(std::string rTarget)
 	pid_t		pid;
 	int			fds[2];
 	std::string	cgiPath = "/bin/php-cgi", reqRTarget = rTarget;
+//	std::string	cgiPath = "/bxin/php-cgi", reqRTarget = rTarget;
 	char		*argv[3] = {(char *)cgiPath.c_str(), (char *)reqRTarget.c_str(), NULL};
+//	char		*argv[5] = {(char *)cgiPath.c_str(), (char *)"-d", (char *)"realpath_cache_size=128", (char *)reqRTarget.c_str(), NULL};
 	char		**env;
 
 	if (pipe(fds) < 0)
-		throw internalServerError();
+	{
+//		throw std::runtime_error("005 point");
+		throw pipeError();
+//		std::cout << "fail 5" << std::endl;
+	}
 	pid = fork();
 	if (pid < 0)
+	{
+//		throw std::runtime_error("006 point");
 		throw internalServerError();
+//		std::cout << "fail 6" << std::endl;
+	}
 	if (!pid)
 	{
 		dup2(fds[1], STDOUT_FILENO);
@@ -441,38 +418,14 @@ int	ResponseGenerator::_execCgi(std::string rTarget)
 		close(fds[1]);
 		env = _generateEnv();
 		execve("/bin/php-cgi", argv, env);
+//		execve("/bxin/php-cgi", argv, env);
+		std::cerr << "execve says bye! this is an error, fyi\n" << std::endl;
 		delete []env;
-		exit(1);
+		throw execveError();
 	}
+	close(fds[1]);
 	_pid = pid;
 	return (fds[0]);
-}
-
-// dummy function. TODO
-// real function is probably like:
-// 200? get something that was required.
-// anything else? get a standard eror page OR a page specified by the config.
-// => needs access to config
-std::string	ResponseGenerator::_getContent(int code)
-{
-	if (code == 200)
-		return ("<head>Hello, my wonderful friends!</head><body><p>This is an html body :3</p></body>");
-	else if (code == 404)
-		return ("<head align=\"center\">404 Not Found</head>");
-	else
-		return ("A secret third option");
-}
-
-// TODO proably a good idea to make a map of statuses
-std::string	ResponseGenerator::_getStatusMessage(int status)
-{
-	switch (status)
-	{
-		case 200:
-			return ("OK");
-		default:
-			return ("Status code message not implemented.");
-	}
 }
 
 std::string	ResponseGenerator::_getDate(void)
@@ -513,6 +466,7 @@ std::string	ResponseGenerator::_getServerName(void)
 }
 
 // it probably needs to look ath the request and behave appropriately
+// however we always return text since it's like char* type deal, not unsigned char* sooooooooooooooo
 std::string	ResponseGenerator::_getContentType(void)
 {
 	return ("text/html");

@@ -22,7 +22,7 @@ class ServerConfig ;
 
 # define KA_TIME 15
 # define CGI_TIME 10
-# define CONNS_AMT 512
+# define CONNS_AMT 500
 # ifndef CRLF
 #  define CRLF "\r\n"
 # endif

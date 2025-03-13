@@ -35,7 +35,6 @@ char	RequestHeadParser::_hexToAscii(size_t i) const
 	return (result);
 }
 
-// what a name lol.
 // resolves the %XX stuff into ascii
 // resolves the ../../../../.. situations into presentable paths (can't go above
 // the server's "/")
@@ -45,7 +44,7 @@ void	RequestHeadParser::_pathDeobfuscator(void)
 	std::string			allHexes = "0123456789abcdefABCDEF";
 	// dubious forbiddenness
 //	std::string			forbiddenCharsPrintable = " \"<>\\^`{|}";
-	// doing a 0x00 here woudl probably be weird and un-parseable
+	// doing a 0x00 here would probably be weird and un-parseable
 	char				lowestForbiddenChar = 0x01;
 	char				highestForbiddenChar = 0x1F;
 	char				bonusForbiddenChar = 0x7F;
@@ -140,18 +139,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	_acceptableMethods.push_back("POST ");
 	_acceptableMethods.push_back("DELETE ");
 	_head["connection"] = "";
-	// parsing this seems like pain, why not just ka forever by default? okay, 30s if we implement the timer
 	_head["keep-alive"] = "";
 	_head["content-length"] = "";
-	// who cares
-	// well maybe we need it actually. for raw data TODO ? test more with curl
-//	_head["content-type"] = "";
-	// now THIS might be important. or not
-//	_head["content-encoding"] = "";
-	// ok this IS important. config supports multiple hosts i assume.
 	_head["host"] = "";
-	// chunking. if you wanna...
-//	_head["transfer-encoding"] = "";
 	std::string			line;
 	std::istringstream	s(r);
 	std::getline(s, line);
@@ -169,50 +159,36 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	}
 	if (it == _acceptableMethods.end())
 	{
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << std::setw(7) << " > " << std::flush;
-		std::cout << "Method not found in acceptable list" << std::endl;
-#endif
-		// TODO maybe 501?
-		throw badRequest();
+		throw methodNotAllowed();
 	}
 
-	// forget about multiline URIs for now
-	// and actually, forever. turns out the eval sheet is very fogriving and small
 	// if ok, parse the protocol out. since it HAS to be of definite length,..
 	//               GET sp   /  sp HTTP/1.1
 	if (line.size() < 3 + 1 + 1 + 1 + 8)
 	{
-#ifdef DEBUG_SERVER_MESSAGES
-		std::cout << std::setw(7) << " > " << std::flush;
-		std::cout << "This first line is way too short" << std::endl;
-#endif
 		throw badRequest();
 	}
 
-	// HTTP/1.0 support or nah? XXX
-	// solely for apache benchmark purposes xddddddd
 	if ((line.find("HTTP/1.1\r", line.size() - std::string("HTTP/1.1\r").size()) == std::string::npos)
 		&& (line.find("HTTP/1.1", line.size() - std::string("HTTP/1.1").size()) == std::string::npos))
 	{
 		if ((line.find("HTTP/1.0\r", line.size() - std::string("HTTP/1.0\r").size()) == std::string::npos)
 			&& (line.find("HTTP/1.0", line.size() - std::string("HTTP/1.0").size()) == std::string::npos))
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << std::setw(7) << " > " << std::flush;
-			std::cout << "Bad protocol" << std::endl;
-#endif
 			throw badRequest();
 		}
 		else
 		{
-			_protocol = "HTTP/1.0";
+			_protocol = "HTTP/1.0";		
+			_keepAlive = false;
 		}
 	}
 	else
 	{
 		_protocol = "HTTP/1.1";
+		_keepAlive = true;
 	}
+//	std::cout << "we've managed a keepalive of " << _keepAlive << std::endl;
 
 	// by that point, the request is probably correct. Still, we need to separate out the requested URI
 	std::string			word;
@@ -226,16 +202,12 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 		else if (wcount >= 3)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << std::setw(7) << " > " << std::flush;
-			std::cout << "Too many words in Start Line" << std::endl;
-#endif
-			throw badRequest();
+			throw methodNotAllowed();
 		}
 		wcount++;
 	}
 
-	// maybe, just maybe, make it accept a string a return a string. maybe for some future use or something. idk. XXX?
+	// XXX just for cleaning up the paths and all, maybe generalize this method to ANY string
 	_pathDeobfuscator();
 	// _rTarget changed. connect it to the url string for the content-location stuff. also, save it as "apparent target" for dirlisting.
 	_apparentTarget = _rTarget;
@@ -247,21 +219,30 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		// if the name of the location is at the very front of the target,...
 		if (_rTarget.find(it->name) == 0)
 		{
-#ifdef DEBUG_SERVER_MESSAGES
-			std::cout << "the starting point of the path is found to be " << it->name << std::endl;
-#endif
-			/// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
+			size_t y;
+			for (y = 0; y < it->accMethods.size(); y++)
+			{
+				if (it->accMethods[y] == _method)
+				{
+					break ;
+				}
+			}
+			if (y == it->accMethods.size())
+			{
+				throw methodNotAllowed();
+			}
+			// before replacing anything, do a redirect check. if true, just quit with return, setting the appropriate thing up firstly
 			if (!(it->redir.empty()))
 			{
 				_redirection = true;
 				std::ostringstream	redirss;
 				redirss << "http://" << server.host << ":" << server.ports[0] << "/" << it->redir;
 				_redirLoc = redirss.str();
+//				std::cout << "returning with keepalive equal to " << _keepAlive << std::cout;
 				return ;
 			}
 			// ...replace it with the root of the location.
 			_rTarget.erase(0, it->name.size());
-			// XXX for now, relativize the root in the location. might be changed soon XXX
 			_rTarget = server.root + "/" + it->root + "/" + _rTarget;
 			// first, check if the result is a directory or not.
 			
@@ -275,7 +256,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 				std::memset(&(st), 0, sizeof(st));
 				int			statResponse;
 				statResponse = stat(_rTarget.c_str(), &st);
-				// there's nothing here lol
+				// there's nothing here
 				if (statResponse == -1)
 				{
 					if (_method == "GET" || _method == "DELETE")
@@ -301,7 +282,7 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 					{
 						// you can't just post a file over a directory which exists already
 						// nor can you delete a directory
-						throw internalServerError();
+						throw forbidden();
 					}
 				}
 				pathFoundInLocs = true;
@@ -311,8 +292,14 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 	}
 	if (!pathFoundInLocs && !_isCgi)
 	{
+		// remember! root is always get-only
+		if (_method != "GET")
+		{
+			throw methodNotAllowed();
+		}
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "path not found in locs. constructing from root" << std::endl;
+		std::cout << _rTarget << std::endl;
 #endif
 		_rTarget = server.root + "/" + _rTarget;
 
@@ -320,26 +307,15 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		std::memset(&(st), 0, sizeof(st));
 		int			statResponse;
 		statResponse = stat(_rTarget.c_str(), &st);
-		// there's nothing here lol
 		if (statResponse == -1)
 		{
-			if (_method == "GET" || _method == "DELETE")
-			{
-				throw notFound();
-			}
+			throw notFound();
 		}
 		// ok, it's a directory, add an index file to it, if autoindex is off
 		// wait, but root autoindex is always off, iirc.
 		if ((st.st_mode & S_IFDIR) == S_IFDIR)
 		{
-			if (_method == "GET")
-			{
-				_rTarget += "/" + server.index;
-			}
-			else
-			{
-				throw internalServerError();
-			}
+			_rTarget += "/" + server.index;
 		}
 	}
 
@@ -402,9 +378,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 			// sorry croski but it's straight to the next field.
 			if (line.find("\r") == line.size() - 1)
 			{
-#ifdef DEBUG_SERVER_MESSAGES
-				std::cout << "\\r located on position " << line.find("\r") << std::endl;
-#endif
 				_head[helper] = line.substr(pos + 1, line.size() - 2 - pos);
 			}
 			else
@@ -477,10 +450,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 	}
 
-	// time to manage k-a parameters
-	//"keep-alive: thing=value,thing=value"
-	// or maybe later TODO
-	// keep-alive timeout in seconds by default shall be:
 	_kaTimeout = KA_TIME;
 
 	// c-l managing

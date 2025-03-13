@@ -1,7 +1,7 @@
 #include "../inc/Connect.hpp"
 
 Connect::Connect()
-	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _cgiTimeStarted(time(NULL)), _kaTimeout(KA_TIME), _cgiTimeout(CGI_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _fd(-1), _remainingFileSize(0), _rTarget(""), _isCgi(false), _firstTimeCgiSend(true), _pid(-2)
+	:	_needsBody(false), _contLen(0), _keepAlive(true), _timeStarted(time(NULL)), _cgiTimeStarted(time(NULL)), _kaTimeout(KA_TIME), _cgiTimeout(CGI_TIME), _sendStr(""), _stillResponding(false), _hasFile(false), _sendingFile(false), _writingFile(false), _fd(-1), _remainingFileSize(0), _rTarget(""), _isCgi(false), _firstTimeCgiSend(true), _pid(-2)
 {
 }
 
@@ -50,8 +50,7 @@ size_t	Connect::getContLen(void) const
 
 bool	Connect::getKeepAlive(void) const
 {
-	//return (_keepAlive);
-	return (true);
+	return (_keepAlive);
 }
 
 time_t	Connect::getTimeStarted(void) const

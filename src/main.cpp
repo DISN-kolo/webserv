@@ -11,7 +11,7 @@ int	main(int argc, char **argv, char **env)
 		server.run();
 	} catch (std::exception &err)
 	{
-		std::cout << err.what() << std::endl;
+		std::cerr << err.what() << "\n" << std::endl;
 	}
 
 

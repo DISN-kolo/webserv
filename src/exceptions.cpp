@@ -25,6 +25,16 @@ const char *configFileMissingException::what(void) const throw()
 	return ("Config file error: missing configuration");
 }
 
+const char *pipeError::what(void) const throw()
+{
+	return ("pipe failed");
+}
+
+const char *execveError::what(void) const throw()
+{
+	return ("execve failed");
+}
+
 const char *socketUnopenedError::what(void) const throw()
 {
 	return ("Socket error: unable to open");
@@ -85,9 +95,19 @@ const char *badRequest::what(void) const throw()
 	return ("400 Bad Request");
 }
 
+const char *forbidden::what(void) const throw()
+{
+	return ("403 Forbidden");
+}
+
 const char *notFound::what(void) const throw()
 {
 	return ("404 Not Found");
+}
+
+const char *methodNotAllowed::what(void) const throw()
+{
+	return ("405 Method Not Allowed");
 }
 
 const char *lengthRequired::what(void) const throw()

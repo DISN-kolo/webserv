@@ -1,5 +1,7 @@
 #include "../inc/Server.hpp"
 
+bool	killMe = false;
+
 Server::Server()
 {
 }
@@ -32,6 +34,13 @@ void	Server::_parseEnv(char **env)
 		_env.push_back(env[i]);
 }
 
+void	_gracefulExit(int sig)
+{
+	(void)sig;
+	std::cout << "Shutting down..." << std::endl;
+	killMe = true;
+}
+
 Server::Server(int argc, char** argv, char **env)
 {
 	_rbufSize = 4096;
@@ -49,6 +58,7 @@ Server::Server(int argc, char** argv, char **env)
 	_nls.push_back(LFCRLF);
 	_nls.push_back(CRLFLF);
 	_nls.push_back(LFLF);
+	signal(SIGINT, _gracefulExit);
 }
 
 Server::Server(const Server & obj)
@@ -115,32 +125,43 @@ int	Server::_checkAvailFdI(void) const
 
 void	Server::_purgeOneConnection(int i)
 {
-	_debugMsgI(i, "thou gotst purg'd!");
-	_localRecvBuffers[i].clear();
-	_localSendStrings[i].clear();
-	_localFWriteBuffers[i].clear();
-	_fWCounts[i] = 0;
-	close(_socks[i].fd);
-	_socks[i].fd = -1;
-
-	if (_perConnArr[i] != NULL)
+	if (i < _connsAmt)
 	{
-		_tempFdI = i + _connsAmt;
-		if (_socks[_tempFdI].fd != -1)
+		_localRecvBuffers[i].clear();
+		_localSendStrings[i].clear();
+		_localFWriteBuffers[i].clear();
+		_fWCounts[i] = 0;
+		if (_perConnArr[i] != NULL)
 		{
-			close(_socks[_tempFdI].fd);
-			_socks[_tempFdI].fd = -1;
-			_debugMsgI(i, "file -1'd; don't forget to unlink/remove it if it's from post and you need it gone");
-		}
+			_tempFdI = i + _connsAmt;
+			if (_socks[_tempFdI].fd != -1)
+			{
+				close(_socks[_tempFdI].fd);
+				_socks[_tempFdI].fd = -1;
+//				_debugMsgI(i, "file -1'd; don't forget to unlink/remove it if it's from post and you need it gone");
+			}
+			_socks[_tempFdI].events = 0;
+			_socks[_tempFdI].revents = 0;
 
-		delete _perConnArr[i];
-		_perConnArr[i] = NULL;
+			delete _perConnArr[i];
+			_perConnArr[i] = NULL;
+		}
 	}
+	if (_socks[i].fd != -1)
+	{
+		close(_socks[i].fd);
+		_socks[i].fd = -1;
+	}
+	_socks[i].events = 0;
+	_socks[i].revents = 0;
+
+//	_debugMsgI(i, "thou gotst purg'd!");
 }
 
 void	Server::_responseObjectHasAFile(int i, ResponseGenerator *responseObject)
 {
 	_tempFdI = i + _connsAmt;
+	_debugMsgI(i, "entered \"ro has a file\"");
 	_perConnArr[i]->setHasFile(true);
 	_socks[_tempFdI].fd = responseObject->getFd();
 	_socks[_tempFdI].events = POLLIN;
@@ -173,6 +194,7 @@ void	Server::_cleanAfterCatching(int i)
 	_perConnArr[i]->setSendStr("");
 	_perConnArr[i]->setHasFile(false);
 	_perConnArr[i]->setSendingFile(false);
+	_perConnArr[i]->setWritingFile(false);
 	_perConnArr[i]->setNeedsBody(false);
 }
 
@@ -185,6 +207,7 @@ void	Server::_cleanAfterNormalRead(int i)
 	_perConnArr[i]->setHasFile(false);
 	_perConnArr[i]->setSendingFile(false);
 	_perConnArr[i]->setStillResponding(false);
+	_perConnArr[i]->setWritingFile(false);
 	_socks[i].events = POLLIN;
 	_localSendStrings[i].clear();
 }
@@ -246,9 +269,10 @@ void	Server::_firstTimeSender(ResponseGenerator *rO, int i, bool clearLRB, bool 
 
 void	Server::_onHeadLocated(int i)
 {
+//	std::cout << "head located: " << std::endl;
+//	std::cout << _localRecvBuffers[i] << std::endl;
 	try
 	{
-		std::cout << "NICE TRY!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" <<std::endl;
 		RequestHeadParser		req(_localRecvBuffers[i], _perConnArr[i]->getServerContext());
 		_perConnArr[i]->setKeepAlive(req.getKeepAlive());
 		_perConnArr[i]->setKaTimeout(req.getKaTimeout());
@@ -267,6 +291,11 @@ void	Server::_onHeadLocated(int i)
 					throw contentTooLarge();
 				}
 				_eraseDoubleNlInLocalRecvBuffer(i);
+				if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
+				{
+					_debugMsgI(i, "cgi post hit inside of head located");
+					_postReadingIsDone(i);
+				}
 				// local fw buffers now only serves the body collection function. we will not use it to write anything.
 			}
 			else
@@ -317,8 +346,25 @@ void	Server::_onHeadLocated(int i)
 			_eraseDoubleNlInLocalRecvBuffer(i);
 		}
 	}
+	catch (pipeError & e)
+	{
+		for (int i = 0; i < _connsAmt * 2; i++)
+		{
+			_purgeOneConnection(i);
+		}
+		throw pipeError();
+	}
+	catch (execveError & e)
+	{
+		for (int i = 0; i < _connsAmt * 2; i++)
+		{
+			_purgeOneConnection(i);
+		}
+		throw execveError();
+	}
 	catch (std::exception & e)
 	{
+		// TODO parse keepalive from http in this
 		_cleanAfterCatching(i);
 		ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
 		if (responseObject.getHasFile())
@@ -330,12 +376,55 @@ void	Server::_onHeadLocated(int i)
 	}
 }
 
+void	Server::_postReadingIsDone(int i)
+{
+	_perConnArr[i]->setNeedsBody(false);
+	if (_perConnArr[i]->getIsCgi())
+	{
+		try
+		{
+			ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+			_responseObjectHasAFile(i, &rO);
+			_firstTimeSender(&rO, i, false, true);
+		}
+		catch (pipeError & e)
+		{
+			for (int i = 0; i < _connsAmt * 2; i++)
+			{
+				_purgeOneConnection(i);
+			}
+			throw pipeError();
+		}
+		catch (execveError & e)
+		{
+			for (int i = 0; i < _connsAmt * 2; i++)
+			{
+				_purgeOneConnection(i);
+			}
+			throw execveError();
+		}
+		catch (std::exception & e)
+		{
+			_cleanAfterCatching(i);
+			ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
+			if (responseObject.getHasFile())
+			{
+				_responseObjectHasAFile(i, &responseObject);
+			}
+
+			_firstTimeSender(&responseObject, i, true, true);
+		}
+	}
+}
+
 void	Server::_acceptNewConnect(int i)
 {
 	_socks[_connectHereIndex].fd = _newConnect;
 	_socks[_connectHereIndex].events = POLLIN;
+	_socks[_connectHereIndex].revents = 0;
 	_perConnArr[_connectHereIndex] = new Connect;
 	_perConnArr[_connectHereIndex]->setServerContext(_perConnArr[i]->getServerContext());
+	_localRecvBuffers[i].clear();
 	_localSendStrings[i].clear();
 	_localFWriteBuffers[i].clear();
 	_fWCounts[i] = 0;
@@ -418,14 +507,14 @@ void	Server::_serverRunSetupInit(void)
 void	Server::run(void)
 {
     if (!_grandConfig->getConfig().size())
-		return;
+		return ;
 
 	_serverRunSetupInit();
 	char	buf[_rbufSize + 1];
-	char	fileToReadBuf[_sbufSize + 1];
+	char	fileToReadBuf[_rbufSize + 1];
 
 	_running = true;
-	while (_running)
+	while (_running || !killMe)
 	{
 		_retCode = poll(_socks, _connsAmt * 2, _timeout);
 #ifdef DEBUG_SERVER_MESSAGES
@@ -434,12 +523,21 @@ void	Server::run(void)
 
 		if (_retCode < 0)
 		{
+			if (killMe)
+			{
+				for (int i = 0; i < _connsAmt * 2; i++)
+				{
+					_purgeOneConnection(i);
+				}
+				return ;
+			}
 			throw pollError();
 		}
 		for (int i = _lstnN; i < _connsAmt; i++)
 		{
 			if (_perConnArr[i] != NULL)
 			{
+//				std::cout << _perConnArr[i]->getKeepAlive() << " <- keepalive for " << i << std::endl;
 				if ((!(_perConnArr[i]->getKeepAlive()) || (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()))
 						&& !(_perConnArr[i]->getStillResponding()) && !(_perConnArr[i]->getSendingFile()) && !(_perConnArr[i]->getWritingFile()))
 				{
@@ -484,7 +582,6 @@ void	Server::run(void)
 						while (_newConnect > 0)
 						{
 							_acceptNewConnect(i);
-							std::cout << "on accept, " << _perConnArr[i]->getKaTimeout() << std::endl;
 							if (_connectHereIndex != -1)
 							{
 								_newConnect = accept(_listenSocks[i], NULL, NULL);
@@ -515,19 +612,17 @@ void	Server::run(void)
 							{
 								if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 								{
-									std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
+//									std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
 									_contentTooBigHandilng(i);
 								}
 								else if (_perConnArr[i]->getContLen() == _localRecvBuffers[i].size())
 								{
 									// it seems that we're done reading the body then.
-									_perConnArr[i]->setNeedsBody(false);
 									if (_perConnArr[i]->getIsCgi())
 									{
-										ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
-										_responseObjectHasAFile(i, &rO);
-										_firstTimeSender(&rO, i, false, true);
+										_debugMsgI(i, "cgi post hit on a retcode 0");
 									}
+									_postReadingIsDone(i);
 								}
 								// else -- nothing. just wait.
 							}
@@ -570,19 +665,17 @@ void	Server::run(void)
 						{
 							if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 							{
-								std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
+//								std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
 								_contentTooBigHandilng(i);
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
-								_localFWriteBuffers[i] += std::string(buf);
-								_perConnArr[i]->setNeedsBody(false);
 								if (_perConnArr[i]->getIsCgi())
 								{
-									ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
-									_responseObjectHasAFile(i, &rO);
-									_firstTimeSender(&rO, i, false, true);
+									_debugMsgI(i, "cgi post hit on a normal retcode");
 								}
+								_localFWriteBuffers[i] += std::string(buf);
+								_postReadingIsDone(i);
 							}
 							else
 							{
@@ -601,8 +694,10 @@ void	Server::run(void)
 			} /* else if POLLIN */
 			else if ((_socks[i].revents & POLLOUT) == POLLOUT)
 			{
+#ifdef DEBUG_SERVER_MESSAGES
 				std::cout << "sending file: " << _perConnArr[i]->getSendingFile() << std::endl;
 				std::cout << "is cgi: " << _perConnArr[i]->getIsCgi() << std::endl;
+#endif
 				// regular sends (not first sends)
 				// step 1. are we sending a file rn? no? well, just send the string that's saved in the perconarr[i]
 				if (!_perConnArr[i]->getSendingFile())
@@ -620,11 +715,13 @@ void	Server::run(void)
 						_perConnArr[i]->setTimeStarted(time(NULL));
 						send(_socks[i].fd, _perConnArr[i]->getSendStr().c_str(), _perConnArr[i]->getSendStr().size(), 0);
 						_perConnArr[i]->setStillResponding(false);
+
 						_perConnArr[i]->eraseSendStr(0, _perConnArr[i]->getSendStr().size());
 						// maybe, cgi send needs to have its own flag XXX
 						if (_perConnArr[i]->getHasFile())
 						{
 							_debugMsgI(i, "switching to filesending mode");
+//							std::cout << "i should send this: " << _socks[i + _connsAmt].fd << std::endl;
 							_perConnArr[i]->setSendingFile(true);
 						}
 						else
@@ -647,7 +744,7 @@ void	Server::run(void)
 					else if ((_socks[_tempFdI].revents & POLLIN) == POLLIN)
 					{
 						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
-						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
+						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _rbufSize);
 						if (_retCode < 0)
 						{
 							_debugMsgI(i, "retcode on file is < 0");
@@ -656,12 +753,14 @@ void	Server::run(void)
 						}
 						else if (_retCode == 0)
 						{
+							_debugMsgI(i, "retcode on file is 0");
 							// we somehow had something from poll but showed up with 0 bytes upon actual reading.
 							_perConnArr[i]->setTimeStarted(time(NULL));
 							_cleanAfterNormalRead(i);
 						}
 						else if (_perConnArr[i]->getRemainingFileSize() == _retCode)
 						{
+							_debugMsgI(i, "perfect retcode on file!");
 							// the amount of file left is exactly the amount that was read. ggs
 							_perConnArr[i]->setTimeStarted(time(NULL));
 							fileToReadBuf[_retCode] = 0;
@@ -679,9 +778,6 @@ void	Server::run(void)
 							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 
 							_perConnArr[i]->diminishRemainingFileSize(_sbufSize);
-
-							_debugMsgI(i, "the file part that was sent:");
-							_debugMsgI(i, _localSendStrings[i]);
 						}
 					}
 					else
@@ -707,7 +803,7 @@ void	Server::run(void)
 					{
 						_debugMsgI(i, "pollin on tempfd sock");
 						std::memset(fileToReadBuf, 0, sizeof (fileToReadBuf));
-						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _sbufSize);
+						_retCode = read(_socks[_tempFdI].fd, fileToReadBuf, _rbufSize);
 						if (_retCode < 0)
 						{
 							_debugMsgI(i, "retcode on file is < 0");
@@ -716,19 +812,21 @@ void	Server::run(void)
 						}
 						else if (_retCode == 0)
 						{
+							_debugMsgI(i, "retcode ZERO");
 							if (!_localSendStrings[i].empty())
 							{
 								_debugMsgI(i, "entered in the polled but ret = 0 state with some dangling tail from cgi");
 								// the remnants
 								_perConnArr[i]->setTimeStarted(time(NULL));
 
-								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 								{
+									send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
 									_localSendStrings[i].clear();
 								}
 								else
 								{
+									send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 									_localSendStrings[i].erase(0, _sbufSize);
 								}
 							}
@@ -741,6 +839,7 @@ void	Server::run(void)
 						}
 						else if (_perConnArr[i]->getFirstTimeCgiSend())
 						{
+							_debugMsgI(i, "cgi's first time send!");
 							fileToReadBuf[_retCode] = 0;
 							_perConnArr[i]->setFirstTimeCgiSend(false);
 							_perConnArr[i]->setTimeStarted(time(NULL));
@@ -759,51 +858,71 @@ void	Server::run(void)
 						}
 						else
 						{
+							_debugMsgI(i, "cgi's regular send!");
 							// the "regular". we need to diminish the local send str by what was sent.
 							_perConnArr[i]->setTimeStarted(time(NULL));
 
 							fileToReadBuf[_retCode] = 0;
-							_localSendStrings[i] += std::string(fileToReadBuf);
-							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
+							_localSendStrings[i] += fileToReadBuf;
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
 								_localSendStrings[i].clear();
 							}
 							else
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
 						}
 					}
 					else
 					{
+						_debugMsgI(i, "revents aren't pollin on the cgi sock......");
 						if (!_localSendStrings[i].empty())
 						{
 							// the remnants
 							_perConnArr[i]->setTimeStarted(time(NULL));
 
-							send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 							if (_localSendStrings[i].size() <= static_cast<size_t>(_sbufSize))
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _localSendStrings[i].size(), 0);
 								_localSendStrings[i].clear();
 							}
 							else
 							{
+								send(_socks[i].fd, _localSendStrings[i].c_str(), _sbufSize, 0);
 								_localSendStrings[i].erase(0, _sbufSize);
 							}
 						}
 						else
 						{
-							_debugMsgI(i, "cgi not ready yet or already done");
+#ifdef DEBUG_SERVER_MESSAGES
 							std::cout << time(NULL) << std::endl;
 							std::cout << _perConnArr[i]->getCgiTimeStarted() << std::endl;
 							std::cout << _perConnArr[i]->getCgiTimeout() << std::endl;
 							std::cout << _perConnArr[i]->getTimeStarted() << std::endl;
 							std::cout << _perConnArr[i]->getKaTimeout() << std::endl;
+#endif
 							if (waitpid(_perConnArr[i]->getPid(), NULL, WNOHANG) == -1)
 							{
 								_debugMsgI(i, "child cgi died itself");
-								_purgeOneConnection(i);
+								if (_perConnArr[i]->getFirstTimeCgiSend())
+								{
+									// we didn't send anything, execve probably failed.
+									_cleanAfterCatching(i);
+									_perConnArr[i]->setIsCgi(false);
+									ResponseGenerator	responseObject("500 Internal Server Error", _perConnArr[i]->getServerContext());
+									if (responseObject.getHasFile())
+									{
+										_responseObjectHasAFile(i, &responseObject);
+									}
+									_firstTimeSender(&responseObject, i, true, true);
+								}
+								else
+								{
+									_purgeOneConnection(i);
+								}
 							}
 							else if (time(NULL) - _perConnArr[i]->getCgiTimeStarted() > _perConnArr[i]->getCgiTimeout())
 							{
@@ -826,6 +945,22 @@ void	Server::run(void)
 					}
 				}
 			} /* else if POLLOUT */
+			if (i >= _lstnN && _perConnArr[i] != NULL)
+			{
+#ifdef DEBUG_SERVER_MESSAGES
+				std::cout << i << std::endl;
+				std::cout << "ka " << _perConnArr[i]->getKeepAlive() << std::endl;
+				std::cout << "to " << (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()) << std::endl;
+				std::cout << "sr " << _perConnArr[i]->getStillResponding() << std::endl;
+				std::cout << "sf " << _perConnArr[i]->getSendingFile() << std::endl;
+				std::cout << "wf " << _perConnArr[i]->getWritingFile() << std::endl;
+#endif
+				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
+						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
+				{
+					_purgeOneConnection(i);
+				}
+			}
 		} /* for to iterate thru _socks upon poll's return */
 		// time to iterate thru the files! (or the cgis)
 		for (int i = _connsAmt; i < _connsAmt * 2; i++)
@@ -855,6 +990,7 @@ void	Server::run(void)
 				if (static_cast<size_t>(_rbufSize) < _localFWriteBuffers[i - _connsAmt].size())
 				{
 					write(_socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _rbufSize);
+					_debugMsgI(i, "I just wrote something using a regular write 1.");
 					_fWCounts[i - _connsAmt] += _rbufSize;
 					_localFWriteBuffers[i - _connsAmt].erase(0, _rbufSize);
 					_localRecvBuffers[i - _connsAmt].erase(0, _rbufSize);
@@ -863,6 +999,7 @@ void	Server::run(void)
 				else
 				{
 					write(_socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _localFWriteBuffers[i - _connsAmt].size());
+					_debugMsgI(i, "I just wrote something using a regular write 2.");
 					if (_localFWriteBuffers[i - _connsAmt].size() > 0)
 					{
 						_perConnArr[i - _connsAmt]->setTimeStarted(time(NULL));
@@ -874,10 +1011,12 @@ void	Server::run(void)
 			}
 			if (_fWCounts[i - _connsAmt] == _perConnArr[i - _connsAmt]->getContLen())
 			{
-				// done. close the file
+				_debugMsgI(i, "done posting.");
 				close(_socks[i].fd);
 				_fWCounts[i - _connsAmt] = 0;
 				_socks[i].fd = -1;
+				_socks[i].events = 0;
+				_socks[i].revents = 0;
 				// must send the 201 created now
 				_socks[i - _connsAmt].events = POLLOUT;
 				_perConnArr[i - _connsAmt]->setWritingFile(false);
@@ -898,7 +1037,11 @@ void	Server::run(void)
 #ifdef DEBUG_SERVER_MESSAGES
 		std::cout << "                one cycle done!" << std::endl;
 #endif
-	} /* while (_running) */
+	} /* while (_running || !killMe) */
+	for (int i = 0; i < _connsAmt * 2; i++)
+	{
+		_purgeOneConnection(i);
+	}
 }
 
 Server::~Server()
