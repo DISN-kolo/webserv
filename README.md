@@ -8,7 +8,7 @@
 
 ### current bugs
 
-* parsing env vars for cgi post is poorly implemented
+* none :)
 
 ### CONFIGURATION FILE
 

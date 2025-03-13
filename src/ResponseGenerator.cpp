@@ -352,18 +352,27 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 char	**ResponseGenerator::_generateEnv(void)
 {
 	int	j = 0;
+	std::stringstream	ss(_bodyStr);
+	std::string			currentPart = "";
+	size_t				eqPos = 0;
 
 	if (!_bodyStr.empty())
 	{
-		for (size_t i = 0; i < _bodyStr.size(); i++)
+		while (std::getline(ss, currentPart, '&'))
 		{
-			if (_bodyStr[i] == '&')
+			if (currentPart.empty())
 			{
-				_env.push_back(_bodyStr.substr(j, i));
-				j = i + 1;
+				continue ;
 			}
-			else if (i + 1 == _bodyStr.size())
-				_env.push_back(_bodyStr.substr(j, i + 1));
+			eqPos = currentPart.find('=');
+			if (eqPos != std::string::npos)
+			{
+				_env.push_back(currentPart);
+			}
+			else
+			{
+				_env.push_back(currentPart + "=");
+			}
 		}
 	}
 
