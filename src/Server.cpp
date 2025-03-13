@@ -897,11 +897,13 @@ void	Server::run(void)
 						}
 						else
 						{
+#ifdef DEBUG_SERVER_MESSAGES
 							std::cout << time(NULL) << std::endl;
 							std::cout << _perConnArr[i]->getCgiTimeStarted() << std::endl;
 							std::cout << _perConnArr[i]->getCgiTimeout() << std::endl;
 							std::cout << _perConnArr[i]->getTimeStarted() << std::endl;
 							std::cout << _perConnArr[i]->getKaTimeout() << std::endl;
+#endif
 							if (waitpid(_perConnArr[i]->getPid(), NULL, WNOHANG) == -1)
 							{
 								_debugMsgI(i, "child cgi died itself");
@@ -945,12 +947,14 @@ void	Server::run(void)
 			} /* else if POLLOUT */
 			if (i >= _lstnN && _perConnArr[i] != NULL)
 			{
+#ifdef DEBUG_SERVER_MESSAGES
 				std::cout << i << std::endl;
 				std::cout << "ka " << _perConnArr[i]->getKeepAlive() << std::endl;
 				std::cout << "to " << (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()) << std::endl;
 				std::cout << "sr " << _perConnArr[i]->getStillResponding() << std::endl;
 				std::cout << "sf " << _perConnArr[i]->getSendingFile() << std::endl;
 				std::cout << "wf " << _perConnArr[i]->getWritingFile() << std::endl;
+#endif
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
 				{
@@ -986,7 +990,7 @@ void	Server::run(void)
 				if (static_cast<size_t>(_rbufSize) < _localFWriteBuffers[i - _connsAmt].size())
 				{
 					write(_socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _rbufSize);
-					_debugMsgI(i, "I just wrote something using a regular write.");
+					_debugMsgI(i, "I just wrote something using a regular write 1.");
 					_fWCounts[i - _connsAmt] += _rbufSize;
 					_localFWriteBuffers[i - _connsAmt].erase(0, _rbufSize);
 					_localRecvBuffers[i - _connsAmt].erase(0, _rbufSize);
@@ -995,7 +999,7 @@ void	Server::run(void)
 				else
 				{
 					write(_socks[i].fd, _localFWriteBuffers[i - _connsAmt].c_str(), _localFWriteBuffers[i - _connsAmt].size());
-					_debugMsgI(i, "I just wrote something using a regular write.");
+					_debugMsgI(i, "I just wrote something using a regular write 2.");
 					if (_localFWriteBuffers[i - _connsAmt].size() > 0)
 					{
 						_perConnArr[i - _connsAmt]->setTimeStarted(time(NULL));
@@ -1007,10 +1011,12 @@ void	Server::run(void)
 			}
 			if (_fWCounts[i - _connsAmt] == _perConnArr[i - _connsAmt]->getContLen())
 			{
-				// done. close the file
+				_debugMsgI(i, "done posting.");
 				close(_socks[i].fd);
 				_fWCounts[i - _connsAmt] = 0;
 				_socks[i].fd = -1;
+				_socks[i].events = 0;
+				_socks[i].revents = 0;
 				// must send the 201 created now
 				_socks[i - _connsAmt].events = POLLOUT;
 				_perConnArr[i - _connsAmt]->setWritingFile(false);
