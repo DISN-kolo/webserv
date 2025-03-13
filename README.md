@@ -8,7 +8,7 @@
 
 ### current bugs
 
-* cgi POST stopped working, up to the point of not even beginning the cgi process. maybe, add a body checker right in the on head located function.. goes for both post variants btw 
+* parsing env vars for cgi post is poorly implemented
 
 ### CONFIGURATION FILE
 

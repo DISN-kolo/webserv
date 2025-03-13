@@ -352,11 +352,9 @@ std::string	ResponseGenerator::_generateListing(std::string dirpath, std::string
 char	**ResponseGenerator::_generateEnv(void)
 {
 	int	j = 0;
-	std::cerr << "hello!\n" << std::endl;
 
 	if (!_bodyStr.empty())
 	{
-		std::cerr << "hello 2!\n" << std::endl;
 		for (size_t i = 0; i < _bodyStr.size(); i++)
 		{
 			if (_bodyStr[i] == '&')
@@ -368,7 +366,6 @@ char	**ResponseGenerator::_generateEnv(void)
 				_env.push_back(_bodyStr.substr(j, i + 1));
 		}
 	}
-	std::cerr << "hello 3!\n" << std::endl;
 
 	char	**env = new char*[_env.size() + 1];
 
@@ -377,9 +374,7 @@ char	**ResponseGenerator::_generateEnv(void)
 	{
 		env[j] = new char[i->size() + 1];
 		env[j++] = const_cast<char *>(i->c_str());
-		std::cerr << i->c_str() << "\n" << std::endl;
 	}
-	std::cerr << "hello 4!\n" << std::endl;
 	env[j] = NULL;
 	return env;
 }
@@ -412,9 +407,7 @@ int	ResponseGenerator::_execCgi(std::string rTarget)
 		dup2(fds[1], STDOUT_FILENO);
 		close(fds[0]);
 		close(fds[1]);
-		std::cerr << "hello! -1\n" << std::endl;
 		env = _generateEnv();
-		std::cerr << "hello! +1\n" << std::endl;
 		execve("/bin/php-cgi", argv, env);
 //		execve("/bxin/php-cgi", argv, env);
 		std::cerr << "execve says bye! this is an error, fyi\n" << std::endl;

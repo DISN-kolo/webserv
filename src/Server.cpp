@@ -291,6 +291,11 @@ void	Server::_onHeadLocated(int i)
 					throw contentTooLarge();
 				}
 				_eraseDoubleNlInLocalRecvBuffer(i);
+				if (_localRecvBuffers[i].size() == static_cast<size_t>(_perConnArr[i]->getContLen()))
+				{
+					_debugMsgI(i, "cgi post hit inside of head located");
+					_cgiPostReadingIsDone(i);
+				}
 				// local fw buffers now only serves the body collection function. we will not use it to write anything.
 			}
 			else
@@ -368,6 +373,47 @@ void	Server::_onHeadLocated(int i)
 		}
 
 		_firstTimeSender(&responseObject, i, true, true);
+	}
+}
+
+void	Server::_cgiPostReadingIsDone(int i)
+{
+	_perConnArr[i]->setNeedsBody(false);
+	if (_perConnArr[i]->getIsCgi())
+	{
+		try
+		{
+			ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+			_responseObjectHasAFile(i, &rO);
+			_firstTimeSender(&rO, i, false, true);
+		}
+		catch (pipeError & e)
+		{
+			for (int i = 0; i < _connsAmt * 2; i++)
+			{
+				_purgeOneConnection(i);
+			}
+			throw pipeError();
+		}
+		catch (execveError & e)
+		{
+			for (int i = 0; i < _connsAmt * 2; i++)
+			{
+				_purgeOneConnection(i);
+			}
+			throw execveError();
+		}
+		catch (std::exception & e)
+		{
+			_cleanAfterCatching(i);
+			ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
+			if (responseObject.getHasFile())
+			{
+				_responseObjectHasAFile(i, &responseObject);
+			}
+
+			_firstTimeSender(&responseObject, i, true, true);
+		}
 	}
 }
 
@@ -572,45 +618,8 @@ void	Server::run(void)
 								else if (_perConnArr[i]->getContLen() == _localRecvBuffers[i].size())
 								{
 									// it seems that we're done reading the body then.
-									_perConnArr[i]->setNeedsBody(false);
-									if (_perConnArr[i]->getIsCgi())
-									{
-										_debugMsgI(i, "cgi hit on a zero read");
-										try
-										{
-											ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
-											_responseObjectHasAFile(i, &rO);
-											_firstTimeSender(&rO, i, false, true);
-										}
-										catch (pipeError & e)
-										{
-											for (int i = 0; i < _connsAmt * 2; i++)
-											{
-												_purgeOneConnection(i);
-											}
-											throw pipeError();
-										}
-										catch (execveError & e)
-										{
-											for (int i = 0; i < _connsAmt * 2; i++)
-											{
-												_purgeOneConnection(i);
-											}
-											throw execveError();
-										}
-										catch (std::exception & e)
-										{
-											// TODO parse keepalive from http in this
-											_cleanAfterCatching(i);
-											ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
-											if (responseObject.getHasFile())
-											{
-												_responseObjectHasAFile(i, &responseObject);
-											}
-
-											_firstTimeSender(&responseObject, i, true, true);
-										}
-									}
+									_debugMsgI(i, "cgi post hit on a retcode 0");
+									_cgiPostReadingIsDone(i);
 								}
 								// else -- nothing. just wait.
 							}
@@ -654,50 +663,13 @@ void	Server::run(void)
 							if (_perConnArr[i]->getContLen() < _localRecvBuffers[i].size())
 							{
 //								std::cout << _perConnArr[i]->getContLen() << ", " << _localRecvBuffers[i].size() << std::endl;
+								_debugMsgI(i, "cgi post hit on a normal retcode");
 								_contentTooBigHandilng(i);
 							}
 							else if (_localRecvBuffers[i].size() == _perConnArr[i]->getContLen())
 							{
 								_localFWriteBuffers[i] += std::string(buf);
-								_perConnArr[i]->setNeedsBody(false);
-								if (_perConnArr[i]->getIsCgi())
-								{
-									_debugMsgI(i, "cgi hit on a non-zero read");
-									try
-									{
-										ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
-										_responseObjectHasAFile(i, &rO);
-										_firstTimeSender(&rO, i, false, true);
-									}
-									catch (pipeError & e)
-									{
-										for (int i = 0; i < _connsAmt * 2; i++)
-										{
-											_purgeOneConnection(i);
-										}
-										throw pipeError();
-									}
-									catch (execveError & e)
-									{
-										for (int i = 0; i < _connsAmt * 2; i++)
-										{
-											_purgeOneConnection(i);
-										}
-										throw execveError();
-									}
-									catch (std::exception & e)
-									{
-										// TODO parse keepalive from http in this
-										_cleanAfterCatching(i);
-										ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
-										if (responseObject.getHasFile())
-										{
-											_responseObjectHasAFile(i, &responseObject);
-										}
-
-										_firstTimeSender(&responseObject, i, true, true);
-									}
-								}
+								_cgiPostReadingIsDone(i);
 							}
 							else
 							{
