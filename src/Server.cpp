@@ -575,6 +575,7 @@ void	Server::run(void)
 									_perConnArr[i]->setNeedsBody(false);
 									if (_perConnArr[i]->getIsCgi())
 									{
+										_debugMsgI(i, "cgi hit on a zero read");
 										try
 										{
 											ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
@@ -661,9 +662,41 @@ void	Server::run(void)
 								_perConnArr[i]->setNeedsBody(false);
 								if (_perConnArr[i]->getIsCgi())
 								{
-									ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
-									_responseObjectHasAFile(i, &rO);
-									_firstTimeSender(&rO, i, false, true);
+									_debugMsgI(i, "cgi hit on a non-zero read");
+									try
+									{
+										ResponseGenerator	rO(_localRecvBuffers[i], _perConnArr[i]->getRTarget(), _env);
+										_responseObjectHasAFile(i, &rO);
+										_firstTimeSender(&rO, i, false, true);
+									}
+									catch (pipeError & e)
+									{
+										for (int i = 0; i < _connsAmt * 2; i++)
+										{
+											_purgeOneConnection(i);
+										}
+										throw pipeError();
+									}
+									catch (execveError & e)
+									{
+										for (int i = 0; i < _connsAmt * 2; i++)
+										{
+											_purgeOneConnection(i);
+										}
+										throw execveError();
+									}
+									catch (std::exception & e)
+									{
+										// TODO parse keepalive from http in this
+										_cleanAfterCatching(i);
+										ResponseGenerator	responseObject(e.what(), _perConnArr[i]->getServerContext());
+										if (responseObject.getHasFile())
+										{
+											_responseObjectHasAFile(i, &responseObject);
+										}
+
+										_firstTimeSender(&responseObject, i, true, true);
+									}
 								}
 							}
 							else
@@ -886,11 +919,11 @@ void	Server::run(void)
 						}
 						else
 						{
-//							std::cout << time(NULL) << std::endl;
-//							std::cout << _perConnArr[i]->getCgiTimeStarted() << std::endl;
-//							std::cout << _perConnArr[i]->getCgiTimeout() << std::endl;
-//							std::cout << _perConnArr[i]->getTimeStarted() << std::endl;
-//							std::cout << _perConnArr[i]->getKaTimeout() << std::endl;
+							std::cout << time(NULL) << std::endl;
+							std::cout << _perConnArr[i]->getCgiTimeStarted() << std::endl;
+							std::cout << _perConnArr[i]->getCgiTimeout() << std::endl;
+							std::cout << _perConnArr[i]->getTimeStarted() << std::endl;
+							std::cout << _perConnArr[i]->getKaTimeout() << std::endl;
 							if (waitpid(_perConnArr[i]->getPid(), NULL, WNOHANG) == -1)
 							{
 								_debugMsgI(i, "child cgi died itself");
@@ -904,7 +937,6 @@ void	Server::run(void)
 									{
 										_responseObjectHasAFile(i, &responseObject);
 									}
-
 									_firstTimeSender(&responseObject, i, true, true);
 								}
 								else
@@ -935,12 +967,12 @@ void	Server::run(void)
 			} /* else if POLLOUT */
 			if (i >= _lstnN && _perConnArr[i] != NULL)
 			{
-//				std::cout << i << std::endl;
-//				std::cout << "ka " << _perConnArr[i]->getKeepAlive() << std::endl;
-//				std::cout << "to " << (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()) << std::endl;
-//				std::cout << "sr " << _perConnArr[i]->getStillResponding() << std::endl;
-//				std::cout << "sf " << _perConnArr[i]->getSendingFile() << std::endl;
-//				std::cout << "wf " << _perConnArr[i]->getWritingFile() << std::endl;
+				std::cout << i << std::endl;
+				std::cout << "ka " << _perConnArr[i]->getKeepAlive() << std::endl;
+				std::cout << "to " << (_perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted()) << std::endl;
+				std::cout << "sr " << _perConnArr[i]->getStillResponding() << std::endl;
+				std::cout << "sf " << _perConnArr[i]->getSendingFile() << std::endl;
+				std::cout << "wf " << _perConnArr[i]->getWritingFile() << std::endl;
 				if ((!_perConnArr[i]->getKeepAlive() || _perConnArr[i]->getKaTimeout() < time(NULL) - _perConnArr[i]->getTimeStarted())
 						&& (!_perConnArr[i]->getStillResponding()) && (!_perConnArr[i]->getSendingFile()) && (!_perConnArr[i]->getWritingFile()))
 				{

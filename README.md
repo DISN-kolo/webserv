@@ -8,6 +8,8 @@
 
 ### current bugs
 
+* cgi POST stopped working, up to the point of not even beginning the cgi process.
+
 ### CONFIGURATION FILE
 
 #### SERVER
