@@ -12,6 +12,8 @@
 
 ### CONFIGURATION FILE
 
+*note: you should use config/myconf.conf*
+
 #### SERVER
 * port: mandatory
 * host: default 127.0.0.1
