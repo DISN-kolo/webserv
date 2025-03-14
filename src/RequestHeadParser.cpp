@@ -461,7 +461,6 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 		}
 		std::istringstream	cls(_head["content-length"]);
 		cls >> _contLen;
-		std::cout << "congratulations! you have found that the content length of this request is equal to........... " << _contLen << std::endl << std::endl;
 		if (cls.fail() || cls.peek() > 0)
 		{
 #ifdef DEBUG_SERVER_MESSAGES
@@ -470,6 +469,9 @@ RequestHeadParser::RequestHeadParser(std::string r, struct config_server_t serve
 #endif
 			throw badRequest();
 		}
+#ifdef DEBUG_SERVER_MESSAGES
+		std::cout << "congratulations! you have found that the content length of this request is equal to........... " << _contLen << std::endl << std::endl;
+#endif
 	}
 }
 

@@ -257,7 +257,9 @@ ResponseGenerator::ResponseGenerator(const RequestHeadParser & req, struct confi
 ResponseGenerator::ResponseGenerator(std::string body, std::string rTarget, std::vector<std::string> env)
 {
 	// POST
+#ifdef DEBUG_SERVER_MESSAGES
 	std::cout << "entering post cgi!" << std::endl;
+#endif
 	_env = env;
 	_bodyStr = body;
 	_hasFile = true;
