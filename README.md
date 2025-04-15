@@ -4,11 +4,10 @@
 ### TODOs
 
 * cleanup TODOs, XXXs, FIXMEs...
-* evaluate
 
 ### current bugs
 
-* none :)
+* using 0.0.0.0 as "host" will break auto-generated links in some places, because the link is generated via "http://" + host + ":" + port + ....; to avoid it, you could specify your actual IP address. Fixing it requires finding out the URL that's in the client's URL field.
 
 ### CONFIGURATION FILE
 
